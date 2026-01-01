@@ -1,0 +1,3 @@
+<!-- BigCircularLogo.jpg should be placed in the public folder -->
+<!-- This is a note: Replace this file with your actual BigCircularLogo.jpg image -->
+<!-- Place your BigCircularLogo.jpg file in: e:\student-information-form\public\BigCircularLogo.jpg -->

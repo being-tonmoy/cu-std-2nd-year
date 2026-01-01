@@ -1,0 +1,78 @@
+Faculty of Arts and Humanities (fah):
+    Bangla
+    English
+    History
+    Philosophy
+    Islamic History and Culture
+    Arabic
+    Islamic Studies
+    Dramatics
+    Institute of Modern Languages
+    Institute of Fine Arts
+    Persian Language & Literature
+    Pali
+    Sanskrit
+    Music
+    Bangladesh Studies
+
+
+Faculty of Science (fsc):
+    Physics
+    Chemistry
+    Mathematics
+    Statistics
+    Applied Chemistry and Chemical Engineering
+    Forestry and Environmental Sciences
+    JNIRCMPS
+
+Faculty of Business Administration (fba):
+    Accounting
+    Management
+    Finance
+    Marketing
+    Human Resource Management
+    Banking and Insurance
+
+
+
+Faculty of Social Sciences (fss):
+    Economics
+    Political Science
+    Sociology
+    Public Administration
+    Anthropology
+    International Relations
+    Communication and Journalism
+    Criminology and Police Science
+    Development Studies
+
+
+
+Faculty of Law (folaw):
+    Law
+
+
+Faculty of Biological Sciences (fbio):
+    Zoology
+    Botany
+    Geography and Environmental Studies
+    Biochemistry & Molecular Biology
+    Microbiology
+    Soil Science
+    Genetic Engineering & Biotechnology
+    Psychology
+    Pharmacy
+
+Faculty of Engineering (fengg):
+    Computer Science & Engineering
+    Electrical & Electronic Engineering
+
+
+Faculty of Education (fedu):
+    Physical Education & Sports Science
+    Institute of Education and Research
+
+Faculty of Marine Sciences and Fisheries (fmsf):
+    Institute of Marine Sciences
+    Oceanography
+    Fisheries
