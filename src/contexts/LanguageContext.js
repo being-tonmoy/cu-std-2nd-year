@@ -28,6 +28,7 @@ const translations = {
     firstSemester: '1st Semester',
     secondSemester: '2nd Semester',
     thirdSemester: '3rd Semester',
+    fourthSemester: '4th Semester',
     submit: 'Submit',
     cancel: 'Cancel',
     required: 'This field is required',
