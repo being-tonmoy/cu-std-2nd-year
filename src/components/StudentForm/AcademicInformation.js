@@ -180,7 +180,8 @@ const AcademicInformation = ({
                 ] : [
                   <MenuItem key="1st" value="1st">{t('firstSemester')}</MenuItem>,
                   <MenuItem key="2nd" value="2nd">{t('secondSemester')}</MenuItem>,
-                  <MenuItem key="3rd" value="3rd">{t('thirdSemester')}</MenuItem>
+                  <MenuItem key="3rd" value="3rd">{t('thirdSemester')}</MenuItem>,
+                  <MenuItem key="4th" value="4th">{t('fourthSemester')}</MenuItem>
                 ]}
               </Select>
             </FormControl>
