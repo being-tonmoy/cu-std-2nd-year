@@ -417,7 +417,7 @@ const AdminComplaints = () => {
                 }}
                 sx={{ color: '#d32f2f', borderColor: '#d32f2f' }}
               >
-                Clear Filters
+                Clear Filters 
               </Button>
             )}
           </Box>
