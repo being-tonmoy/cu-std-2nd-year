@@ -1,4 +1,3 @@
-import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import Box from '@mui/material/Box';
@@ -9,7 +8,6 @@ import BackgroundDesign from './components/BackgroundDesign';
 import PublicRoutes from './routes/PublicRoutes';
 import AdminRoutes from './routes/AdminRoutes';
 import NotFound from './pages/NotFound';
-import { createAdminUser, getUserByEmail } from './services/firestoreService';
 import './App.css';
 // Component to initialize superadmin user
 function AppRoutes() {
