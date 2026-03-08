@@ -33,6 +33,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import SearchIcon from '@mui/icons-material/Search';
 import DownloadIcon from '@mui/icons-material/Download';
 import LogoutIcon from '@mui/icons-material/Logout';
+import ArchiveIcon from '@mui/icons-material/Archive';
+import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import Swal from 'sweetalert2';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -60,6 +62,7 @@ const SubmissionManagement = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [selectedRows, setSelectedRows] = useState(new Set());
+  const [filterArchived, setFilterArchived] = useState('');
 
   useEffect(() => {
     loadSubmissions();
@@ -88,6 +91,12 @@ const SubmissionManagement = () => {
       filtered = filtered.filter(sub => sub.department === filterDepartment);
     }
 
+    // Apply archived filter
+    if (filterArchived !== '') {
+      const isArchived = filterArchived === 'archived';
+      filtered = filtered.filter(sub => (sub.isArchived || false) === isArchived);
+    }
+
     // Sort
     filtered.sort((a, b) => {
       let aValue = a[orderBy];
@@ -103,7 +112,7 @@ const SubmissionManagement = () => {
     });
 
     setFilteredSubmissions(filtered);
-  }, [submissions, searchQuery, order, orderBy, filterFaculty, filterDepartment]);
+  }, [submissions, searchQuery, order, orderBy, filterFaculty, filterDepartment, filterArchived]);
 
   const loadFacultyData = async () => {
     try {
@@ -251,7 +260,8 @@ const SubmissionManagement = () => {
       'Department',
       'Session',
       'Year/Semester',
-      'Submitted Date'
+      'Submitted Date',
+      'Status'
     ];
 
     const data = dataToExport.map(sub => [
@@ -265,7 +275,8 @@ const SubmissionManagement = () => {
       sub.department,
       sub.session,
       `${sub.yearSemesterType} ${sub.yearSemesterValue}`,
-      new Date(sub.createdAt?.toDate?.() || sub.createdAt).toLocaleString()
+      new Date(sub.createdAt?.toDate?.() || sub.createdAt).toLocaleString(),
+      (sub.isArchived || false) ? 'Archived' : 'Active'
     ]);
 
     // Create CSV content
@@ -380,15 +391,120 @@ const SubmissionManagement = () => {
     }
   };
 
-  const departmentOptions = (() => {
-    if (!filterFaculty) return [];
-    // Find the faculty data entry that matches the selected faculty name
-    for (const [, info] of Object.entries(facultyData)) {
-      if (info.name === filterFaculty) {
-        return info.departments || [];
+  const handleArchiveSelected = async (shouldArchive) => {
+    if (selectedRows.size === 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'No Selection',
+        text: 'Please select at least one submission to ' + (shouldArchive ? 'archive' : 'unarchive'),
+        confirmButtonColor: '#001f3f'
+      });
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: `Confirm ${shouldArchive ? 'Archive' : 'Unarchive'}`,
+      text: `Are you sure you want to ${shouldArchive ? 'archive' : 'unarchive'} ${selectedRows.size} submission(s)?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#ff9800',
+      cancelButtonColor: '#757575',
+      confirmButtonText: shouldArchive ? 'Archive' : 'Unarchive'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        setLoading(true);
+        const selectedSubmissions = filteredSubmissions.filter(sub => selectedRows.has(sub.id));
+        
+        for (const submission of selectedSubmissions) {
+          await updateSubmission(
+            submission.studentId,
+            submission.facultyAlias,
+            submission.department,
+            { isArchived: shouldArchive }
+          );
+        }
+
+        setSelectedRows(new Set());
+        Swal.fire({
+          icon: 'success',
+          title: shouldArchive ? 'Archived' : 'Unarchived',
+          text: `${selectedSubmissions.length} submission(s) ${shouldArchive ? 'archived' : 'unarchived'} successfully`,
+          timer: 2000,
+          confirmButtonColor: '#001f3f'
+        });
+        await loadSubmissions();
+      } catch (error) {
+        console.error('Error updating submissions:', error);
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: `Failed to ${shouldArchive ? 'archive' : 'unarchive'} some submissions`,
+          confirmButtonColor: '#001f3f'
+        });
+      } finally {
+        setLoading(false);
       }
     }
-    return [];
+  };
+
+  const handleToggleArchive = async (submission) => {
+    const shouldArchive = !(submission.isArchived || false);
+    const result = await Swal.fire({
+      title: `Confirm ${shouldArchive ? 'Archive' : 'Unarchive'}`,
+      text: `Are you sure you want to ${shouldArchive ? 'archive' : 'unarchive'} ${submission.firstName} ${submission.lastName}'s submission?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#ff9800',
+      cancelButtonColor: '#757575',
+      confirmButtonText: shouldArchive ? 'Archive' : 'Unarchive'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        setLoading(true);
+        await updateSubmission(
+          submission.studentId,
+          submission.facultyAlias,
+          submission.department,
+          { isArchived: shouldArchive }
+        );
+        Swal.fire({
+          icon: 'success',
+          title: shouldArchive ? 'Archived' : 'Unarchived',
+          text: `Submission ${shouldArchive ? 'archived' : 'unarchived'} successfully`,
+          timer: 2000,
+          confirmButtonColor: '#001f3f'
+        });
+        await loadSubmissions();
+      } catch (error) {
+        console.error('Error updating submission:', error);
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: `Failed to ${shouldArchive ? 'archive' : 'unarchive'} submission`,
+          confirmButtonColor: '#001f3f'
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const departmentOptions = (() => {
+    // If a faculty is selected, use its departments
+    if (filterFaculty) {
+      for (const [, info] of Object.entries(facultyData)) {
+        if (info.name === filterFaculty) {
+          return info.departments || [];
+        }
+      }
+      return [];
+    }
+    // Otherwise, get all unique departments from submissions
+    const allDepartments = new Set(submissions.map(sub => sub.department).filter(Boolean));
+    return Array.from(allDepartments).sort();
   })();
 
   const getTableHeaders = () => {
@@ -400,7 +516,8 @@ const SubmissionManagement = () => {
       { id: 'department', label: 'Department' },
       { id: 'email', label: 'Email' },
       { id: 'session', label: 'Session' },
-      { id: 'createdAt', label: 'Submitted Date' }
+      { id: 'createdAt', label: 'Submitted Date' },
+      { id: 'isArchived', label: 'Status' }
     ];
   };
 
@@ -444,6 +561,24 @@ const SubmissionManagement = () => {
               {selectedRows.size} row(s) selected
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="contained"
+                startIcon={<ArchiveIcon />}
+                size="small"
+                onClick={() => handleArchiveSelected(true)}
+                sx={{ bgcolor: '#ff9800', '&:hover': { bgcolor: '#f57c00' } }}
+              >
+                Archive
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<UnarchiveIcon />}
+                size="small"
+                onClick={() => handleArchiveSelected(false)}
+                sx={{ bgcolor: '#4caf50', '&:hover': { bgcolor: '#388e3c' } }}
+              >
+                Unarchive
+              </Button>
               <Button
                 variant="contained"
                 color="error"
@@ -509,13 +644,25 @@ const SubmissionManagement = () => {
               </FormControl>
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
-              <FormControl fullWidth size="small" disabled={!filterFaculty}>
+              <FormControl fullWidth size="small">
                 <InputLabel id="department-select-label">Department</InputLabel>
                 <Select
                   labelId="department-select-label"
                   id="department-select"
                   value={filterDepartment}
-                  onChange={(e) => setFilterDepartment(e.target.value)}
+                  onChange={(e) => {
+                    const selectedDept = e.target.value;
+                    setFilterDepartment(selectedDept);
+                    // Auto-select faculty if a department is chosen
+                    if (selectedDept) {
+                      for (const [, info] of Object.entries(facultyData)) {
+                        if (info.departments && info.departments.includes(selectedDept)) {
+                          setFilterFaculty(info.name);
+                          break;
+                        }
+                      }
+                    }
+                  }}
                   label="Department"
                   sx={{
                     width: '100%',
@@ -534,10 +681,33 @@ const SubmissionManagement = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} sm={12} md={3}>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel id="archive-select-label">Archive Status</InputLabel>
+                <Select
+                  labelId="archive-select-label"
+                  id="archive-select"
+                  value={filterArchived}
+                  onChange={(e) => setFilterArchived(e.target.value)}
+                  label="Archive Status"
+                  sx={{
+                    width: '100%',
+                    minWidth: '200px',
+                    '& .MuiOutlinedInput-input': {
+                      padding: '10px 14px'
+                    }
+                  }}
+                >
+                  <MenuItem value="">All Status</MenuItem>
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="archived">Archived</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={1}>
               <Box sx={{ p: 1, bgcolor: '#f5f5f5', borderRadius: '4px', textAlign: 'center', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Typography variant="body2" sx={{ color: '#666', fontWeight: 'bold' }}>
-                  {filteredSubmissions.length} submissions found
+                  {filteredSubmissions.length} found
                 </Typography>
               </Box>
             </Grid>
@@ -640,6 +810,20 @@ const SubmissionManagement = () => {
                         <TableCell>
                           {new Date(submission.createdAt?.toDate?.() || submission.createdAt).toLocaleString()}
                         </TableCell>
+                        <TableCell>
+                          <Box sx={{ 
+                            display: 'inline-block',
+                            px: 2,
+                            py: 0.5,
+                            borderRadius: '12px',
+                            bgcolor: (submission.isArchived || false) ? '#ffecb3' : '#c8e6c9',
+                            color: (submission.isArchived || false) ? '#f57f17' : '#2e7d32',
+                            fontWeight: 'bold',
+                            fontSize: '0.85rem'
+                          }}>
+                            {(submission.isArchived || false) ? 'Archived' : 'Active'}
+                          </Box>
+                        </TableCell>
                         <TableCell align="right">
                           <Tooltip title="Edit">
                             <IconButton
@@ -648,6 +832,15 @@ const SubmissionManagement = () => {
                               sx={{ color: '#1976d2' }}
                             >
                               <EditIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title={submission.isArchived ? 'Unarchive' : 'Archive'}>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleToggleArchive(submission)}
+                              sx={{ color: '#ff9800' }}
+                            >
+                              {submission.isArchived ? <UnarchiveIcon /> : <ArchiveIcon />}
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Delete">

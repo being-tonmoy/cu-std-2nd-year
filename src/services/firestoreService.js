@@ -230,6 +230,7 @@ export const saveStudentForm = async (formData, facultyData) => {
       yearSemesterType,
       yearSemesterValue,
       agreeToTerms,
+      isArchived: false, // Default to not archived
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now()
     };
