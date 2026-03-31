@@ -9,10 +9,13 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
+import Switch from '@mui/material/Switch';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import LogoutIcon from '@mui/icons-material/Logout';
 import DownloadIcon from '@mui/icons-material/Download';
+import WarningIcon from '@mui/icons-material/Warning';
 import Swal from 'sweetalert2';
-import { saveFacultyData, getFacultyData } from '../services/firestoreService';
+import { saveFacultyData, getFacultyData, getMaintenanceStatus, updateMaintenanceStatus } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
 
 // Sample faculty data
@@ -95,11 +98,23 @@ const AdminSetup = () => {
   const [loading, setLoading] = useState(false);
   const [savedData, setSavedData] = useState(null);
   const [loadingData, setLoadingData] = useState(true);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false);
 
   // Load existing faculty data on mount
   useEffect(() => {
     loadFacultyData();
+    loadMaintenanceStatus();
   }, []);
+
+  const loadMaintenanceStatus = async () => {
+    try {
+      const status = await getMaintenanceStatus();
+      setMaintenanceMode(status);
+    } catch (error) {
+      console.error('Error loading maintenance status:', error);
+    }
+  };
 
   const loadFacultyData = async () => {
     try {
@@ -134,6 +149,53 @@ const AdminSetup = () => {
   const handleLogout = () => {
     logout();
     navigate('/admin/login');
+  };
+
+  const handleMaintenanceModeToggle = async (event) => {
+    const newStatus = event.target.checked;
+
+    // Show confirmation dialog
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: newStatus ? 'Enable Maintenance Mode?' : 'Disable Maintenance Mode?',
+      html: newStatus 
+        ? '<p>Enabling maintenance mode will show a maintenance page to all users trying to access the form.</p><p><strong>Form submissions will not be accessible.</strong></p>'
+        : '<p>Disabling maintenance mode will allow users to access the form normally again.</p>',
+      showCancelButton: true,
+      confirmButtonText: 'Confirm',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: newStatus ? '#d32f2f' : '#001f3f',
+      reverseButtons: true
+    });
+
+    if (result.isConfirmed) {
+      try {
+        setMaintenanceLoading(true);
+        await updateMaintenanceStatus(newStatus);
+        setMaintenanceMode(newStatus);
+        
+        Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: newStatus ? 'Maintenance mode enabled successfully' : 'Maintenance mode disabled successfully',
+          confirmButtonColor: '#001f3f'
+        });
+      } catch (error) {
+        console.error('Error updating maintenance status:', error);
+        setMaintenanceMode(!newStatus); // Revert toggle on error
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Failed to update maintenance mode: ' + error.message,
+          confirmButtonColor: '#001f3f'
+        });
+      } finally {
+        setMaintenanceLoading(false);
+      }
+    } else {
+      // User cancelled, revert the toggle
+      setMaintenanceMode(!newStatus);
+    }
   };
 
   const parseFacultyData = (text) => {
@@ -274,6 +336,53 @@ const AdminSetup = () => {
               Paste the faculty data in the format provided. The system will automatically parse the aliases in parentheses and create timestamps.
             </Typography>
           </Alert>
+
+          {/* Maintenance Mode Section */}
+          <Paper
+            sx={{
+              p: 3,
+              mb: 6,
+              background: maintenanceMode ? 'rgba(211, 47, 47, 0.05)' : 'rgba(1, 87, 155, 0.05)',
+              border: `2px solid ${maintenanceMode ? '#d32f2f' : '#0157a0'}`,
+              borderRadius: '8px'
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <WarningIcon sx={{ color: maintenanceMode ? '#d32f2f' : '#0157a0', fontSize: '28px' }} />
+                <Box>
+                  <Typography variant="h6" sx={{ color: '#001f3f', fontWeight: 'bold', mb: 0.5 }}>
+                    Maintenance Mode Control
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#666' }}>
+                    {maintenanceMode 
+                      ? 'Maintenance mode is currently ENABLED. Form page will show maintenance message.' 
+                      : 'Maintenance mode is currently DISABLED. Form is accessible to users.'
+                    }
+                  </Typography>
+                </Box>
+              </Box>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={maintenanceMode}
+                    onChange={handleMaintenanceModeToggle}
+                    disabled={maintenanceLoading}
+                    size="medium"
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#d32f2f'
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#d32f2f'
+                      }
+                    }}
+                  />
+                }
+                label=""
+              />
+            </Box>
+          </Paper>
 
           {/* Input Section */}
           <Box sx={{ mb: 6 }}>

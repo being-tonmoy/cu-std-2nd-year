@@ -653,3 +653,50 @@ export const updateComplaintStatus = async (complaintId, status) => {
     throw error;
   }
 };
+
+/**
+ * Get maintenance mode status from basic-info
+ * @returns {Promise<boolean>} - True if maintenance mode is enabled, false otherwise
+ */
+export const getMaintenanceStatus = async () => {
+  try {
+    const basicInfoRef = doc(db, 'student-information-form', 'basic-info');
+    const basicInfoDoc = await getDoc(basicInfoRef);
+
+    if (basicInfoDoc.exists()) {
+      const data = basicInfoDoc.data();
+      return data.maintenanceMode || false;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error getting maintenance status:', error);
+    return false;
+  }
+};
+
+/**
+ * Update maintenance mode status in basic-info
+ * @param {boolean} isEnabled - True to enable maintenance mode, false to disable
+ * @returns {Promise<object>} - Success/failure response
+ */
+export const updateMaintenanceStatus = async (isEnabled) => {
+  try {
+    const basicInfoRef = doc(db, 'student-information-form', 'basic-info');
+    
+    const dataToSave = {
+      maintenanceMode: isEnabled,
+      maintenanceModeUpdatedAt: Timestamp.now(),
+      maintenanceModeUpdatedBy: 'superadmin'
+    };
+
+    await setDoc(basicInfoRef, dataToSave, { merge: true });
+
+    return {
+      success: true,
+      message: isEnabled ? 'Maintenance mode enabled' : 'Maintenance mode disabled'
+    };
+  } catch (error) {
+    console.error('Error updating maintenance status:', error);
+    throw error;
+  }
+};

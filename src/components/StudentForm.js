@@ -23,11 +23,13 @@ import {
 import { 
   checkDuplicateSubmission, 
   saveStudentForm,
-  getFacultyData
+  getFacultyData,
+  getMaintenanceStatus
 } from '../services/firestoreService';
 import PersonalInformation from './StudentForm/PersonalInformation';
 import AcademicInformation from './StudentForm/AcademicInformation';
 import TermsAndConditions from './StudentForm/TermsAndConditions';
+import MaintenancePage from './MaintenancePage';
 
 const StudentForm = () => {
   const { t, language } = useLanguage();
@@ -52,11 +54,26 @@ const StudentForm = () => {
   const [submissionExists, setSubmissionExists] = useState(null);
   const [departments, setDepartments] = useState([]);
   const [facultyData, setFacultyData] = useState(null);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [loadingMaintenance, setLoadingMaintenance] = useState(true);
 
-  // Load faculty data on component mount
+  // Load faculty data and check maintenance status on component mount
   useEffect(() => {
     loadFacultyDataFromFirestore();
+    checkMaintenanceStatus();
   }, []);
+
+  const checkMaintenanceStatus = async () => {
+    try {
+      setLoadingMaintenance(true);
+      const status = await getMaintenanceStatus();
+      setMaintenanceMode(status);
+    } catch (error) {
+      console.error('Error checking maintenance status:', error);
+    } finally {
+      setLoadingMaintenance(false);
+    }
+  };
 
   const loadFacultyDataFromFirestore = async () => {
     try {
@@ -360,13 +377,18 @@ const StudentForm = () => {
 
   return (
     <>
-      <Helmet>
-        <title>{t('formTitle')} | {t('studentForm')}</title>
-        <meta name="description" content={t('formDescription')} />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-      </Helmet>
+      {/* Show maintenance page if maintenance mode is enabled */}
+      {!loadingMaintenance && maintenanceMode ? (
+        <MaintenancePage />
+      ) : !loadingMaintenance ? (
+        <>
+          <Helmet>
+            <title>{t('formTitle')} | {t('studentForm')}</title>
+            <meta name="description" content={t('formDescription')} />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+          </Helmet>
 
-      <Container maxWidth="lg" sx={{ py: { xs: 4, sm: 6, md: 8 }, position: 'relative', zIndex: 10 }}>
+          <Container maxWidth="lg" sx={{ py: { xs: 4, sm: 6, md: 8 }, position: 'relative', zIndex: 10 }}>
         <Paper 
           elevation={0}
           sx={{
@@ -632,6 +654,21 @@ const StudentForm = () => {
           </form>
         </Paper>
       </Container>
+        </>
+      ) : (
+        // Show loading spinner while checking maintenance status
+        <Box
+          sx={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'linear-gradient(135deg, #001f3f 0%, #003d7a 100%)'
+          }}
+        >
+          <CircularProgress sx={{ color: 'white' }} />
+        </Box>
+      )}
     </>
   );
 };
