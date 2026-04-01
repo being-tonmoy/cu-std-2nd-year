@@ -3,21 +3,22 @@ import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
-import { useAuth } from '../contexts/AuthContext';
+// import { useAuth } from '../contexts/AuthContext';
 
 const Header = () => {
   const { language, toggleLanguage } = useLanguage();
-  const { logout, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
+  // const { logout, isAuthenticated } = useAuth();
+  // const navigate = useNavigate();
   const location = useLocation();
 
   // Handle logout
-  const handleLogout = () => {
-    logout();
-    navigate('/admin/login');
-  };
+  // const handleLogout = () => {
+  //   logout();
+  //   navigate('/admin/login');
+  // };
 
   // Hide header only on login page
   const isLoginPage = location.pathname === '/admin/login';
@@ -106,7 +107,7 @@ const Header = () => {
                   fontSize: { xs: '12px', sm: '13px', md: '14px' }
                 }}
               >
-                Student Information Portal
+                Institutional Email Application Form
               </Typography>
             </Box>
           </Box>
@@ -129,7 +130,7 @@ const Header = () => {
             >
               {language === 'en' ? '🇧🇩 বাংলা' : '🇬🇧 English'}
             </Button>
-            {isAuthenticated && (
+            {/* {isAuthenticated && (
               <Button 
                 variant="contained" 
                 onClick={handleLogout}
@@ -145,7 +146,7 @@ const Header = () => {
               >
                 Logout
               </Button>
-            )}
+            )} */}
           </Box>
         </Box>
       </Container>

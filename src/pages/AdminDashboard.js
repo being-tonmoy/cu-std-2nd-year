@@ -176,8 +176,8 @@ const AdminDashboard = () => {
   return (
     <>
       <Helmet>
-        <title>Admin Dashboard - Student Information Form</title>
-        <meta name="description" content="Admin dashboard for managing student submissions" />
+        <title>Admin Dashboard - Institutional Email Application Form</title>
+        <meta name="description" content="Admin dashboard for managing institutional email submissions" />
       </Helmet>
 
       <Container maxWidth="lg" sx={{ py: 4 }}>

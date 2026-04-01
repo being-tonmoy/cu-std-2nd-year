@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Admin Setup page allows administrators to import and manage faculty and department information for the student information form. This data is stored in Firestore and automatically fetched by the form.
+The Admin Setup page allows administrators to import and manage faculty and department information for the Institutional Email Application Form. This data is stored in Firestore and automatically fetched by the form.
 
 ## Accessing the Admin Setup Page
 

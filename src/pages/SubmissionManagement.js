@@ -32,11 +32,12 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import SearchIcon from '@mui/icons-material/Search';
 import DownloadIcon from '@mui/icons-material/Download';
-import LogoutIcon from '@mui/icons-material/Logout';
 import ArchiveIcon from '@mui/icons-material/Archive';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import BlockIcon from '@mui/icons-material/Block';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Swal from 'sweetalert2';
-import { useAuth } from '../contexts/AuthContext';
 import { 
   getAllSubmissions, 
   deleteStudentSubmission,
@@ -46,7 +47,6 @@ import {
 
 const SubmissionManagement = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
   const [submissions, setSubmissions] = useState([]);
   const [filteredSubmissions, setFilteredSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +63,7 @@ const SubmissionManagement = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [filterArchived, setFilterArchived] = useState('');
+  const [filterDegreeLevel, setFilterDegreeLevel] = useState('');
 
   useEffect(() => {
     loadSubmissions();
@@ -97,6 +98,11 @@ const SubmissionManagement = () => {
       filtered = filtered.filter(sub => (sub.isArchived || false) === isArchived);
     }
 
+    // Apply degree level filter
+    if (filterDegreeLevel) {
+      filtered = filtered.filter(sub => (sub.degreeLevel || 'Bachelor') === filterDegreeLevel);
+    }
+
     // Sort
     filtered.sort((a, b) => {
       let aValue = a[orderBy];
@@ -112,7 +118,7 @@ const SubmissionManagement = () => {
     });
 
     setFilteredSubmissions(filtered);
-  }, [submissions, searchQuery, order, orderBy, filterFaculty, filterDepartment, filterArchived]);
+  }, [submissions, searchQuery, order, orderBy, filterFaculty, filterDepartment, filterArchived, filterDegreeLevel]);
 
   const loadFacultyData = async () => {
     try {
@@ -169,6 +175,7 @@ const SubmissionManagement = () => {
           phoneNumber: editFormData.phoneNumber,
           aliasEmail: editFormData.aliasEmail,
           session: editFormData.session,
+          degreeLevel: editFormData.degreeLevel || 'Bachelor',
           yearSemesterType: editFormData.yearSemesterType,
           yearSemesterValue: editFormData.yearSemesterValue
         }
@@ -233,6 +240,19 @@ const SubmissionManagement = () => {
   };
 
   const downloadCSV = () => {
+    // Faculty shortform mapping
+    const facultyShortforms = {
+      'Faculty of Arts and Humanities': 'fah',
+      'Faculty of Science': 'fsc',
+      'Faculty of Business Administration': 'fba',
+      'Faculty of Social Sciences': 'fss',
+      'Faculty of Law': 'law',
+      'Faculty of Biological Sciences': 'fbs',
+      'Faculty of Engineering': 'fe',
+      'Faculty of Education': 'fedu',
+      'Faculty of Marine Sciences and Fisheries': 'fmsf'
+    };
+
     let dataToExport = filteredSubmissions;
     
     if (selectedRows.size > 0) {
@@ -255,9 +275,13 @@ const SubmissionManagement = () => {
       'Last Name',
       'Email',
       'Alias Email',
+      'Institutional Email',
+      'Alias_Email',
       'Phone',
       'Faculty',
+      'Faculty_Short',
       'Department',
+      'Degree Level',
       'Session',
       'Year/Semester',
       'Submitted Date',
@@ -270,9 +294,13 @@ const SubmissionManagement = () => {
       sub.lastName,
       sub.email,
       sub.aliasEmail,
+      `${sub.studentId}@std.cu.ac.bd`,
+      `${sub.aliasEmail}@std.cu.ac.bd`,
       sub.phoneNumber,
       sub.faculty,
+      `/Student/${facultyShortforms[sub.faculty] || ''}`,
       sub.department,
+      sub.degreeLevel || 'Bachelor',
       sub.session,
       `${sub.yearSemesterType} ${sub.yearSemesterValue}`,
       new Date(sub.createdAt?.toDate?.() || sub.createdAt).toLocaleString(),
@@ -304,12 +332,6 @@ const SubmissionManagement = () => {
       confirmButtonColor: '#001f3f'
     });
   };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/admin/login');
-  };
-
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
   };
@@ -514,6 +536,7 @@ const SubmissionManagement = () => {
       { id: 'lastName', label: 'Last Name' },
       { id: 'faculty', label: 'Faculty' },
       { id: 'department', label: 'Department' },
+      { id: 'degreeLevel', label: 'Degree Level' },
       { id: 'email', label: 'Email' },
       { id: 'session', label: 'Session' },
       { id: 'createdAt', label: 'Submitted Date' },
@@ -524,16 +547,24 @@ const SubmissionManagement = () => {
   return (
     <>
       <Helmet>
-        <title>Submission Management - Student Information Form</title>
+        <title>Submission Management - Institutional Email Application Form</title>
         <meta name="description" content="Manage student form submissions" />
       </Helmet>
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
         {/* Header */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-          <Typography variant="h3" sx={{ color: '#001f3f', fontWeight: 'bold' }}>
-            Submission Management
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <IconButton
+              onClick={() => navigate('/admin/dashboard')}
+              sx={{ color: '#001f3f' }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+            <Typography variant="h3" sx={{ color: '#001f3f', fontWeight: 'bold' }}>
+              Submission Management
+            </Typography>
+          </Box>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <Button
               variant="contained"
@@ -542,14 +573,6 @@ const SubmissionManagement = () => {
               sx={{ bgcolor: '#00897b', '&:hover': { bgcolor: '#004d40' } }}
             >
               Download CSV
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<LogoutIcon />}
-              onClick={handleLogout}
-              sx={{ borderColor: '#d32f2f', color: '#d32f2f' }}
-            >
-              Logout
             </Button>
           </Box>
         </Box>
@@ -681,7 +704,7 @@ const SubmissionManagement = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={6} md={2}>
               <FormControl fullWidth size="small">
                 <InputLabel id="archive-select-label">Archive Status</InputLabel>
                 <Select
@@ -701,6 +724,31 @@ const SubmissionManagement = () => {
                   <MenuItem value="">All Status</MenuItem>
                   <MenuItem value="active">Active</MenuItem>
                   <MenuItem value="archived">Archived</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel id="degree-level-select-label">Degree Level</InputLabel>
+                <Select
+                  labelId="degree-level-select-label"
+                  id="degree-level-select"
+                  value={filterDegreeLevel}
+                  onChange={(e) => setFilterDegreeLevel(e.target.value)}
+                  label="Degree Level"
+                  sx={{
+                    width: '100%',
+                    minWidth: '200px',
+                    '& .MuiOutlinedInput-input': {
+                      padding: '10px 14px'
+                    }
+                  }}
+                >
+                  <MenuItem value="">All Levels</MenuItem>
+                  <MenuItem value="Bachelor">Bachelor</MenuItem>
+                  <MenuItem value="Masters">Masters</MenuItem>
+                  <MenuItem value="M.Phil">M.Phil</MenuItem>
+                  <MenuItem value="PhD">PhD</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -725,7 +773,7 @@ const SubmissionManagement = () => {
               <Table>
                 <TableHead sx={{ bgcolor: '#001f3f' }}>
                   <TableRow>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold', backgroundColor: '#001f3f', width: '50px' }}>
+                    <TableCell sx={{ color: 'white', fontWeight: 'bold', backgroundColor: '#001f3f', width: '50px', fontSize: '0.875rem', padding: '8px 4px' }}>
                       <Checkbox
                         indeterminate={selectedRows.size > 0 && selectedRows.size < filteredSubmissions.length}
                         checked={filteredSubmissions.length > 0 && selectedRows.size === filteredSubmissions.length}
@@ -739,7 +787,9 @@ const SubmissionManagement = () => {
                         sx={{ 
                           color: 'white', 
                           fontWeight: 'bold',
-                          backgroundColor: '#001f3f'
+                          backgroundColor: '#001f3f',
+                          fontSize: '0.875rem',
+                          padding: '8px 4px'
                         }}
                         sortDirection={orderBy === header.id ? order : false}
                       >
@@ -768,7 +818,9 @@ const SubmissionManagement = () => {
                       sx={{ 
                         color: 'white', 
                         fontWeight: 'bold',
-                        backgroundColor: '#001f3f'
+                        backgroundColor: '#001f3f',
+                        fontSize: '0.875rem',
+                        padding: '8px 4px'
                       }} 
                       align="right"
                     >
@@ -791,65 +843,64 @@ const SubmissionManagement = () => {
                         selected={selectedRows.has(submission.id)}
                         sx={{ 
                           bgcolor: selectedRows.has(submission.id) ? '#e3f2fd' : 'inherit',
-                          '&:hover': { bgcolor: selectedRows.has(submission.id) ? '#bbdefb' : '#f5f5f5' }
+                          '&:hover': { bgcolor: selectedRows.has(submission.id) ? '#bbdefb' : '#f5f5f5' },
+                          height: '40px'
                         }}
                       >
-                        <TableCell sx={{ width: '50px' }}>
+                        <TableCell sx={{ width: '50px', padding: '4px 8px', fontSize: '0.85rem' }}>
                           <Checkbox
                             checked={selectedRows.has(submission.id)}
                             onChange={() => handleSelectRow(submission.id)}
                           />
                         </TableCell>
-                        <TableCell>{submission.studentId}</TableCell>
-                        <TableCell>{submission.firstName}</TableCell>
-                        <TableCell>{submission.lastName}</TableCell>
-                        <TableCell>{submission.faculty}</TableCell>
-                        <TableCell>{submission.department}</TableCell>
-                        <TableCell>{submission.email}</TableCell>
-                        <TableCell>{submission.session}</TableCell>
-                        <TableCell>
+                        <TableCell sx={{ padding: '4px 8px', fontSize: '0.85rem' }}>{submission.studentId}</TableCell>
+                        <TableCell sx={{ padding: '4px 8px', fontSize: '0.85rem' }}>{submission.firstName}</TableCell>
+                        <TableCell sx={{ padding: '4px 8px', fontSize: '0.85rem' }}>{submission.lastName}</TableCell>
+                        <TableCell sx={{ padding: '4px 8px', fontSize: '0.85rem' }}>{submission.faculty}</TableCell>
+                        <TableCell sx={{ padding: '4px 8px', fontSize: '0.85rem' }}>{submission.department}</TableCell>
+                        <TableCell sx={{ padding: '4px 8px', fontSize: '0.85rem' }}>{submission.degreeLevel || 'Bachelor'}</TableCell>
+                        <TableCell sx={{ padding: '4px 8px', fontSize: '0.85rem' }}>{submission.email}</TableCell>
+                        <TableCell sx={{ padding: '4px 8px', fontSize: '0.85rem' }}>{submission.session}</TableCell>
+                        <TableCell sx={{ padding: '4px 8px', fontSize: '0.85rem' }}>
                           {new Date(submission.createdAt?.toDate?.() || submission.createdAt).toLocaleString()}
                         </TableCell>
-                        <TableCell>
-                          <Box sx={{ 
-                            display: 'inline-block',
-                            px: 2,
-                            py: 0.5,
-                            borderRadius: '12px',
-                            bgcolor: (submission.isArchived || false) ? '#ffecb3' : '#c8e6c9',
-                            color: (submission.isArchived || false) ? '#f57f17' : '#2e7d32',
-                            fontWeight: 'bold',
-                            fontSize: '0.85rem'
-                          }}>
-                            {(submission.isArchived || false) ? 'Archived' : 'Active'}
-                          </Box>
+                        <TableCell sx={{ padding: '4px 8px', width: '50px' }}>
+                          <Tooltip title={submission.isArchived ? 'Archived' : 'Active'}>
+                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                              {(submission.isArchived || false) ? (
+                                <BlockIcon sx={{ color: '#ff9800', fontSize: '20px' }} />
+                              ) : (
+                                <CheckCircleIcon sx={{ color: '#4caf50', fontSize: '20px' }} />
+                              )}
+                            </Box>
+                          </Tooltip>
                         </TableCell>
-                        <TableCell align="right">
+                        <TableCell align="right" sx={{ padding: '4px 4px', width: '100px' }}>
                           <Tooltip title="Edit">
                             <IconButton
                               size="small"
                               onClick={() => handleEditSubmission(submission)}
-                              sx={{ color: '#1976d2' }}
+                              sx={{ color: '#1976d2', padding: '2px' }}
                             >
-                              <EditIcon />
+                              <EditIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title={submission.isArchived ? 'Unarchive' : 'Archive'}>
                             <IconButton
                               size="small"
                               onClick={() => handleToggleArchive(submission)}
-                              sx={{ color: '#ff9800' }}
+                              sx={{ color: '#ff9800', padding: '2px' }}
                             >
-                              {submission.isArchived ? <UnarchiveIcon /> : <ArchiveIcon />}
+                              {submission.isArchived ? <UnarchiveIcon fontSize="small" /> : <ArchiveIcon fontSize="small" />}
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Delete">
                             <IconButton
                               size="small"
                               onClick={() => handleDeleteSubmission(submission)}
-                              sx={{ color: '#d32f2f' }}
+                              sx={{ color: '#d32f2f', padding: '2px' }}
                             >
-                              <DeleteIcon />
+                              <DeleteIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
                         </TableCell>
@@ -887,6 +938,7 @@ const SubmissionManagement = () => {
                 fullWidth
                 value={editFormData.studentId || ''}
                 disabled
+                sx={{mt:3}}
                 InputProps={{ readOnly: true }}
               />
               
@@ -923,6 +975,20 @@ const SubmissionManagement = () => {
                   InputProps={{ readOnly: true }}
                 />
               </Box>
+
+              {/* Degree Level */}
+              <TextField
+                label="Degree Level"
+                fullWidth
+                value={editFormData.degreeLevel || 'Bachelor'}
+                onChange={(e) => setEditFormData({ ...editFormData, degreeLevel: e.target.value })}
+                select
+              >
+                <MenuItem value="Bachelor">Bachelor</MenuItem>
+                <MenuItem value="Masters">Masters</MenuItem>
+                <MenuItem value="M.Phil">M.Phil</MenuItem>
+                <MenuItem value="PhD">PhD</MenuItem>
+              </TextField>
 
               {/* Email and Phone Row */}
               <Box sx={{ display: 'flex', gap: 2 }}>

@@ -11,12 +11,12 @@ import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import LogoutIcon from '@mui/icons-material/Logout';
 import DownloadIcon from '@mui/icons-material/Download';
 import WarningIcon from '@mui/icons-material/Warning';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import IconButton from '@mui/material/IconButton';
 import Swal from 'sweetalert2';
 import { saveFacultyData, getFacultyData, getMaintenanceStatus, updateMaintenanceStatus } from '../services/firestoreService';
-import { useAuth } from '../contexts/AuthContext';
 
 // Sample faculty data
 const SAMPLE_FACULTY_DATA = `Faculty of Arts and Humanities (fah):
@@ -93,7 +93,6 @@ Faculty of Marine Sciences and Fisheries (fmsf):
 
 const AdminSetup = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
   const [facultyText, setFacultyText] = useState('');
   const [loading, setLoading] = useState(false);
   const [savedData, setSavedData] = useState(null);
@@ -146,10 +145,6 @@ const AdminSetup = () => {
     });
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/admin/login');
-  };
 
   const handleMaintenanceModeToggle = async (event) => {
     const newStatus = event.target.checked;
@@ -303,31 +298,31 @@ const AdminSetup = () => {
         >
           {/* Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 6 }}>
-            <Box>
-              <Typography
-                variant="h3"
-                component="h1"
-                sx={{
-                  color: '#001f3f',
-                  fontWeight: 'bold',
-                  mb: 1,
-                  fontSize: { xs: '24px', sm: '28px', md: '36px' }
-                }}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <IconButton
+                onClick={() => navigate('/admin/dashboard')}
+                sx={{ color: '#001f3f', mt: 1 }}
               >
-                Faculty & Department Setup
-              </Typography>
-              <Typography variant="body1" sx={{ color: '#666' }}>
-                Configure faculties and departments for the registration system.
-              </Typography>
+                <ArrowBackIcon />
+              </IconButton>
+              <Box>
+                <Typography
+                  variant="h3"
+                  component="h1"
+                  sx={{
+                    color: '#001f3f',
+                    fontWeight: 'bold',
+                    mb: 1,
+                    fontSize: { xs: '24px', sm: '28px', md: '36px' }
+                  }}
+                >
+                  Faculty & Department Setup
+                </Typography>
+                <Typography variant="body1" sx={{ color: '#666' }}>
+                  Configure faculties and departments for the registration system.
+                </Typography>
+              </Box>
             </Box>
-            <Button
-              variant="outlined"
-              startIcon={<LogoutIcon />}
-              onClick={handleLogout}
-              sx={{ borderColor: '#d32f2f', color: '#d32f2f', fontWeight: 'bold' }}
-            >
-              Logout
-            </Button>
           </Box>
 
           {/* Instructions Alert */}

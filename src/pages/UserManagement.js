@@ -30,9 +30,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import LogoutIcon from '@mui/icons-material/Logout';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Swal from 'sweetalert2';
-import { useAuth } from '../contexts/AuthContext';
 import { 
   getAllAdminUsers, 
   createAdminUser, 
@@ -42,8 +41,6 @@ import {
 import { generatePassword } from '../utils/validation';
 
 const UserManagement = () => {
-  const navigate = useNavigate();
-  const { logout } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -220,24 +217,30 @@ const UserManagement = () => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/admin/login');
-  };
+  // navigater for back button
+  const navigate = useNavigate();
 
   return (
     <>
       <Helmet>
-        <title>User Management - Student Information Form</title>
+        <title>User Management - Institutional Email Application Form</title>
         <meta name="description" content="Manage admin users and permissions" />
       </Helmet>
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {/* Header */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-          <Typography variant="h3" sx={{ color: '#001f3f', fontWeight: 'bold' }}>
-            User Management
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <IconButton
+              onClick={() => navigate('/admin/dashboard')}
+              sx={{ color: '#001f3f' }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+            <Typography variant="h3" sx={{ color: '#001f3f', fontWeight: 'bold' }}>
+              User Management
+            </Typography>
+          </Box>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <Button
               variant="contained"
@@ -252,14 +255,6 @@ const UserManagement = () => {
                 <RefreshIcon />
               </IconButton>
             </Tooltip>
-            <Button
-              variant="outlined"
-              startIcon={<LogoutIcon />}
-              onClick={handleLogout}
-              sx={{ borderColor: '#d32f2f', color: '#d32f2f' }}
-            >
-              Logout
-            </Button>
           </Box>
         </Box>
 

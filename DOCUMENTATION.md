@@ -1,4 +1,4 @@
-# Student Information Form - Project Documentation
+# Institutional Email Application Form - Project Documentation
 
 ## Table of Contents
 1. [Project Overview](#project-overview)
@@ -16,7 +16,7 @@
 
 ## Project Overview
 
-The Student Information Form is a React-based web application for the University of Chittagong (2024-2025 Session) designed to collect student information during registration. The application supports:
+The Institutional Email Application Form is a React-based web application for the University of Chittagong (2024-2025 Session) designed to collect student information during registration. The application supports:
 
 - **Bilingual Interface**: English and Bangla (Bengali) language support
 - **Institutional Email Provisioning**: Automatic alias email assignment (@std.cu.ac.bd)

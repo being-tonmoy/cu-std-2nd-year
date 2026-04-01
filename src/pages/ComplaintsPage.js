@@ -354,7 +354,7 @@ const ComplaintsPage = () => {
   return (
     <>
       <Helmet>
-        <title>Report Issue & Track Complaints - Student Information Form</title>
+        <title>Report Issue & Track Complaints - Institutional Email Application Form</title>
         <meta name="description" content="Report issues and track your complaints" />
       </Helmet>
 

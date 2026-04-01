@@ -48,7 +48,7 @@ const LoginPage = () => {
   return (
     <>
       <Helmet>
-        <title>Admin Login - Student Information Form</title>
+        <title>Admin Login - Institutional Email Application Form</title>
         <meta name="description" content="Admin login page" />
       </Helmet>
 
@@ -103,7 +103,7 @@ const LoginPage = () => {
                 Admin Login
               </Typography>
               <Typography variant="body2" sx={{ color: '#666' }}>
-                University of Chittagong - Student Information System
+                University of Chittagong - Institutional Email Application Form
               </Typography>
             </Box>
 

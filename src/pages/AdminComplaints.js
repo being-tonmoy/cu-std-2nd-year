@@ -28,13 +28,11 @@ import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Swal from 'sweetalert2';
-import { useAuth } from '../contexts/AuthContext';
 import { db } from '../utils/firebase';
 import { collection, getDocs, setDoc, deleteDoc, doc, addDoc, Timestamp, query, orderBy } from 'firebase/firestore';
 
 const AdminComplaints = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
   const [complaints, setComplaints] = useState([]);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [openReplyDialog, setOpenReplyDialog] = useState(false);
@@ -311,7 +309,7 @@ const AdminComplaints = () => {
         <meta name="description" content="Admin panel for managing student complaints" />
       </Helmet>
 
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Container maxWidth="xl" sx={{ py: 4 }}>
         {/* Header */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -330,17 +328,6 @@ const AdminComplaints = () => {
               </Typography>
             </Box>
           </Box>
-          <Button
-            variant="outlined"
-            startIcon={<CloseIcon />}
-            onClick={() => {
-              logout();
-              navigate('/admin/login');
-            }}
-            sx={{ borderColor: '#d32f2f', color: '#d32f2f', fontWeight: 'bold' }}
-          >
-            Logout
-          </Button>
         </Box>
 
         {/* Search and Filter Bar */}
@@ -430,35 +417,35 @@ const AdminComplaints = () => {
         <Paper sx={{ borderRadius: '12px', overflow: 'hidden' }}>
           <TableContainer sx={{ maxHeight: 'calc(100vh - 300px)' }}>
             <Table  >
-              <TableHead >
-                <TableRow sx={{ bgcolor: '#001f3f !important' }}>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '110px' }}>Student ID</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '150px' }}>Title</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '180px' }}>Email</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '130px' }}>Department</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '100px' }}>Status</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '140px' }}>Opened</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '140px' }}>Last Updated</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '120px' }} align="center">Actions</TableCell>
+              <TableHead>
+                <TableRow sx={{ bgcolor: '#001f3f !important', height: '40px' }}>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '110px', fontSize: '0.875rem', padding: '8px 4px' }}>Student ID</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '150px', fontSize: '0.875rem', padding: '8px 4px' }}>Title</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '180px', fontSize: '0.875rem', padding: '8px 4px' }}>Email</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '130px', fontSize: '0.875rem', padding: '8px 4px' }}>Department</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '100px', fontSize: '0.875rem', padding: '8px 4px' }}>Status</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '140px', fontSize: '0.875rem', padding: '8px 4px' }}>Opened</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '140px', fontSize: '0.875rem', padding: '8px 4px' }}>Last Updated</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '120px', fontSize: '0.875rem', padding: '8px 4px' }} align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredComplaints.length > 0 ? (
                   filteredComplaints.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((complaint) => (
-                    <TableRow key={complaint.id} sx={{ '&:hover': { background: '#f5f5f5' } }}>
-                      <TableCell sx={{ fontWeight: '500', width: '110px' }}>{complaint.studentId}</TableCell>
-                      <TableCell sx={{ width: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <TableRow key={complaint.id} sx={{ height: '40px', '&:hover': { background: '#f5f5f5' } }}>
+                      <TableCell sx={{ fontWeight: '500', width: '110px', fontSize: '0.85rem', padding: '4px 8px' }}>{complaint.studentId}</TableCell>
+                      <TableCell sx={{ width: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem', padding: '4px 8px' }}>
                         <Typography variant="body2" title={complaint.title}>
                           {complaint.title}
                         </Typography>
                       </TableCell>
-                      <TableCell sx={{ width: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <TableCell sx={{ width: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem', padding: '4px 8px' }}>
                         <Typography variant="body2" title={complaint.email}>
                           {complaint.email}
                         </Typography>
                       </TableCell>
-                      <TableCell sx={{ width: '130px' }}>{complaint.department}</TableCell>
-                      <TableCell sx={{ width: '100px' }}>
+                      <TableCell sx={{ width: '130px', fontSize: '0.85rem', padding: '4px 8px' }}>{complaint.department}</TableCell>
+                      <TableCell sx={{ width: '100px', fontSize: '0.85rem', padding: '4px 8px' }}>
                         <Chip
                           label={complaint.status || 'open'}
                           size="small"
@@ -470,9 +457,9 @@ const AdminComplaints = () => {
                           }}
                         />
                       </TableCell>
-                      <TableCell sx={{ fontSize: '12px', width: '140px' }}>{formatDate(complaint.openedAt)}</TableCell>
-                      <TableCell sx={{ fontSize: '12px', width: '140px' }}>{formatDate(complaint.lastUpdatedAt)}</TableCell>
-                      <TableCell align="center" sx={{ width: '120px' }}>
+                      <TableCell sx={{ fontSize: '0.85rem', width: '140px', padding: '4px 8px' }}>{formatDate(complaint.openedAt)}</TableCell>
+                      <TableCell sx={{ fontSize: '0.85rem', width: '140px', padding: '4px 8px' }}>{formatDate(complaint.lastUpdatedAt)}</TableCell>
+                      <TableCell align="center" sx={{ width: '120px', padding: '4px 8px' }}>
                         <IconButton
                           size="small"
                           onClick={() => handleEditClick(complaint)}
@@ -541,6 +528,7 @@ const AdminComplaints = () => {
             select
             label="Status"
             value={editStatus}
+            sx={{mt:2}}
             onChange={(e) => setEditStatus(e.target.value)}
             variant="outlined"
           >

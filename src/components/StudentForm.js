@@ -18,7 +18,8 @@ import {
   validatePhoneNumber, 
   validateName,
   cleanPhoneNumber,
-  validateAliasEmail
+  validateAliasEmailWithError,
+  checkStudentIdInCSV
 } from '../utils/validation';
 import { 
   checkDuplicateSubmission, 
@@ -41,6 +42,7 @@ const StudentForm = () => {
     session: '',
     faculty: '',
     department: '',
+    degreeLevel: 'Bachelor',
     phoneNumber: '',
     email: '',
     aliasEmail: '',
@@ -61,7 +63,21 @@ const StudentForm = () => {
   useEffect(() => {
     loadFacultyDataFromFirestore();
     checkMaintenanceStatus();
+    preloadStudentCSV(); // Preload CSV in background while student fills form
   }, []);
+
+  // Preload the CSV file in the background so it's ready when user submits
+  const preloadStudentCSV = async () => {
+    try {
+      const response = await fetch('/students.csv');
+      if (response.ok) {
+        console.log('CSV preloaded successfully');
+      }
+    } catch (error) {
+      console.error('Error preloading CSV:', error);
+      // Silent fail - doesn't affect form functionality
+    }
+  };
 
   const checkMaintenanceStatus = async () => {
     try {
@@ -184,7 +200,9 @@ const StudentForm = () => {
 
     // Validate student ID
     if (!validateStudentId(formData.studentId)) {
-      newErrors.studentId = t('invalidId');
+      newErrors.studentId = language === 'en' 
+        ? 'Student ID must be either 8 or 10 digits'
+        : 'শিক্ষার্থী আইডি ৮ বা ১০ অঙ্কের হতে হবে';
     }
 
     // Check for duplicate
@@ -205,6 +223,11 @@ const StudentForm = () => {
       newErrors.department = t('required');
     }
 
+    // Validate degree level
+    if (!formData.degreeLevel) {
+      newErrors.degreeLevel = t('required');
+    }
+
     // Validate phone number
     if (!validatePhoneNumber(formData.phoneNumber)) {
       newErrors.phoneNumber = t('invalidPhone');
@@ -215,13 +238,10 @@ const StudentForm = () => {
       newErrors.email = t('invalidEmail');
     }
 
-    // Validate alias email format
-    if (!validateAliasEmail(formData.aliasEmail)) {
-      newErrors.aliasEmail = language === 'en' 
-        ? 'Invalid alias email format. Use 2-30 characters: letters, numbers, dots, hyphens, or underscores.' 
-        : 'অবৈধ উপনাম ইমেল ফরম্যাট। ২-৩০ অক্ষর ব্যবহার করুন: অক্ষর, সংখ্যা, ডট, হাইফেন বা আন্ডারস্কোর।';
-    } else if (!formData.aliasEmail || formData.aliasEmail.trim() === '') {
-      newErrors.aliasEmail = t('required');
+    // Validate alias email format with specific error message
+    const aliasValidation = validateAliasEmailWithError(formData.aliasEmail, formData.studentId, language);
+    if (!aliasValidation.valid) {
+      newErrors.aliasEmail = aliasValidation.error;
     }
 
     // Validate year/semester
@@ -249,9 +269,24 @@ const StudentForm = () => {
         if (isDuplicate) {
           Swal.fire({
             icon: 'error',
-            title: language === 'en' ? 'Duplicate Submission' : 'ডুপ্লিকেট জমা দেওয়া',
-            text: t('duplicateId'),
-            confirmButtonColor: '#001f3f'
+            title: language === 'en' ? 'Application Already Exists' : 'আবেদন ইতিমধ্যে জমা দেওয়া হয়েছে',
+            html: language === 'en'
+              ? `<p style="text-align: left;">There is already an application for the student ID <strong>${formData.studentId}</strong> in our system.</p>
+                  <p style="text-align: left; margin-top: 15px;">If you have mistakenly submitted or need to update your information, please contact the ICT Cell, CU:</p>
+                  </br>
+                  <p style="text-align: left;">
+                    <strong>Email:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
+                    <strong>Visit:</strong> ICT Cell, IT Bhaban, University of Chittagong, Chittagong
+                  </p>`
+              : `<p style="text-align: left;">শিক্ষার্থী আইডি <strong>${formData.studentId}</strong> এর জন্য আমাদের সিস্টেমে ইতিমধ্যে একটি আবেদন রয়েছে।</p>
+                  <p style="text-align: left; margin-top: 15px;">যদি আপনি ভুলবশত জমা দিয়ে থাকেন বা আপনার তথ্য আপডেট করতে চান, তবে আই সি টি সেল, চট্টগ্রাম বিশ্ববিদ্যালয়-এ যোগাযোগ করুন:</p>
+                  </br>
+                  <p style="text-align: left;">
+                    <strong>ইমেইল:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
+                    <strong>ভিজিট করুন:</strong> আই সি টি সেল, আই টি ভবন, চট্টগ্রাম বিশ্ববিদ্যালয়, চট্টগ্রাম
+                  </p>`,
+            confirmButtonColor: '#001f3f',
+            allowOutsideClick: false
           });
           setLoading(false);
           return;
@@ -261,11 +296,50 @@ const StudentForm = () => {
         Swal.fire({
           icon: 'error',
           title: language === 'en' ? 'Error' : 'ত্রুটি',
-          text: language === 'en' ? 'Error checking duplicate submission' : 'ডুপ্লিকেট জমা যাচাই করতে ত্রুটি',
+          text: language === 'en' 
+            ? 'Unable to verify if an application already exists. Please try again.' 
+            : 'আবেদন যাচাই করতে সক্ষম নই। আবার চেষ্টা করুন।',
           confirmButtonColor: '#001f3f'
         });
         setLoading(false);
         return;
+      }
+      setLoading(false);
+    }
+
+    // Check student ID in CSV (only for Bachelor and Masters, not M.Phil/PhD)
+    if (validateStudentId(formData.studentId) && (formData.degreeLevel === 'Bachelor' || formData.degreeLevel === 'Masters')) {
+      setLoading(true);
+      try {
+        const idExists = await checkStudentIdInCSV(formData.studentId);
+        if (!idExists) {
+          Swal.fire({
+            icon: 'error',
+            title: language === 'en' ? 'Student ID Not Found' : 'শিক্ষার্থী আইডি পাওয়া যায়নি',
+            html: language === 'en' 
+              ? `<p style="text-align: left;">The student ID <strong>${formData.studentId}</strong> doesn't exist in the database.</p>
+                  <p style="text-align: left; margin-top: 15px;">If you are sure you have entered the correct ID, please contact the ICT Cell, CU:</p>
+                  </br>
+                  <p style="text-align: left;">
+                    <strong>Address:</strong> ICT Cell, IT Bhaban, University of Chittagong, Chittagong<br/>
+                    <strong>Email:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a>
+                  </p>`
+              : `<p style="text-align: left;">শিক্ষার্থী আইডি <strong>${formData.studentId}</strong> ডাটাবেসে পাওয়া যায়নি।</p>
+                  <p style="text-align: left; margin-top: 15px;">যদি আপনি নিশ্চিত থাকেন যে আপনি সঠিক আইডি প্রবেশ করেছেন, তবে দয়া করে আই সি টি সেল, চট্টগ্রাম বিশ্ববিদ্যালয়-এ যোগাযোগ করুন:</p>
+                  </br>
+                  <p style="text-align: left;">
+                    <strong>Address:</strong> আইসিটি সেল, আইটি ভবন, চট্টগ্রাম বিশ্ববিদ্যালয়, চট্টগ্রাম<br/>
+                    <strong>ইমেইল:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a>
+                  </p>`,
+            confirmButtonColor: '#001f3f',
+            allowOutsideClick: false
+          });
+          setLoading(false);
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking student ID in CSV:', error);
+        // Continue with submission even if CSV check fails due to network issues
       }
       setLoading(false);
     }
@@ -280,6 +354,7 @@ const StudentForm = () => {
         session: 'Session',
         faculty: 'Faculty',
         department: 'Department',
+        degreeLevel: 'Degree Level',
         phoneNumber: 'Phone Number',
         email: 'Email',
         aliasEmail: 'Alias Email',
@@ -287,14 +362,22 @@ const StudentForm = () => {
         agreeToTerms: 'Terms and Conditions'
       };
       
-      const errorMessage = errorFields.length > 0 
-        ? `Please correct: ${errorFields.map(f => fieldLabels[f] || f).join(', ')}`
-        : 'Please correct the errors in the form';
+      // Build detailed error message with specific error details
+      let errorMessage = '';
+      if (errorFields.length > 0) {
+        errorMessage = errorFields.map(f => {
+          const label = fieldLabels[f] || f;
+          const detail = errors[f];
+          return `<strong>${label}:</strong> ${detail}`;
+        }).join('<br/><br/>');
+      } else {
+        errorMessage = 'Please correct the errors in the form';
+      }
 
       Swal.fire({
         icon: 'error',
         title: language === 'en' ? 'Validation Error' : 'বৈধতা ত্রুটি',
-        text: language === 'en' ? errorMessage : 'ফর্মের ত্রুটিগুলি সংশোধন করুন',
+        html: language === 'en' ? errorMessage : 'ফর্মের ত্রুটিগুলি সংশোধন করুন',
         confirmButtonColor: '#001f3f'
       });
       return;
@@ -321,6 +404,7 @@ const StudentForm = () => {
         session: '',
         faculty: '',
         department: '',
+        degreeLevel: 'Bachelor',
         phoneNumber: '',
         email: '',
         aliasEmail: '',
@@ -425,13 +509,13 @@ const StudentForm = () => {
             </Typography>
           </Box>
 
-          {/* English Form Instruction Alert */}
+          {/* Form Instruction Alert */}
           <Alert 
             severity="info" 
             sx={{ mb: 4, borderRadius: '8px', background: 'rgba(2, 136, 209, 0.1)', border: '1px solid rgba(2, 136, 209, 0.3)' }}
           >
             <Typography variant="body2" sx={{ fontSize: '14px', color: '#01579b' }}>
-              <strong>{t('importantNote')}:</strong> {t('formEnglishInstruction')}
+              <strong>{t('importantNote')}:</strong> {language === 'en' ? 'Please fill the form in English to ensure consistency in the database.' : 'ডেটাবেসে সামঞ্জস্য নিশ্চিত করতে দয়া করে ফর্মটি ইংরেজিতে পূরণ করুন।'}
             </Typography>
           </Alert>
 
@@ -544,7 +628,10 @@ const StudentForm = () => {
             {/* Contact Information */}
             <Box sx={{ textAlign: 'center', my: 4 }}>
               <Typography variant="body2" sx={{ color: '#666', fontStyle: 'italic' }}>
-                In case of any queries, feel free to contact at{' '}
+                {language === 'en' 
+                  ? `In case of any queries, feel free to contact at `
+                  : `কোনো প্রশ্নের জন্য, নির্দ্বিধায় যোগাযোগ করুন `
+                }
                 <Typography
                   component="a"
                   href="mailto:tonmoy.ict@cu.ac.bd"
@@ -591,7 +678,7 @@ const StudentForm = () => {
                   letterSpacing: '1px'
                 }}
               >
-                Having Issues?
+                {language === 'en' ? 'Having Issues?' : 'সমস্যা হচ্ছে?'}
               </Typography>
               <Box 
                 sx={{
@@ -613,7 +700,9 @@ const StudentForm = () => {
                   lineHeight: 1.6
                 }}
               >
-                If you're facing any issues or have complaints, you can report them here. We will respond to your concerns as soon as possible.
+                {language === 'en'
+                  ? "If you're facing any issues or have complaints, you can report them here. We will respond to your concerns as soon as possible."
+                  : 'যদি আপনি কোনো সমস্যার সম্মুখীন হন বা অভিযোগ থাকে, তবে আপনি এখানে তা রিপোর্ট করতে পারেন। আমরা যত তাড়াতাড়ি সম্ভব আপনার উদ্বেগের সমাধান করব।'}
               </Typography>
             </Box>
 
@@ -648,7 +737,7 @@ const StudentForm = () => {
                   }
                 }}
               >
-                Report Issue / Track Complaints
+                {language === 'en' ? 'Report Issue / Track Complaints' : 'সমস্যা রিপোর্ট করুন / অভিযোগ ট্র্যাক করুন'}
               </Button>
             </Box>
           </form>
@@ -659,7 +748,7 @@ const StudentForm = () => {
         // Show loading spinner while checking maintenance status
         <Box
           sx={{
-            minHeight: '100vh',
+            minHeight: '90vh',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

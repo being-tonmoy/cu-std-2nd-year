@@ -173,21 +173,44 @@ export const getAllAdminUsers = async () => {
 
 /**
  * Check if a student ID already has a submission
- * Checks the form-values collection for existing submissions
+ * Iterates through all faculties and departments to check if a document exists with the given studentId
  * @param {string} studentId - The student ID to check
  * @returns {Promise<boolean>} - True if submission exists, false otherwise
  */
 export const checkDuplicateSubmission = async (studentId) => {
   try {
-    // Query the form-values collection using collectionGroup
-    const submissionsRef = collectionGroup(db, 'submissions');
-    const q = query(submissionsRef, where('studentId', '==', studentId));
-    const querySnapshot = await getDocs(q);
-    return !querySnapshot.empty;
+    // Get faculty data first
+    const facultyData = await getFacultyData();
+    
+    if (!facultyData) {
+      console.warn('No faculty data found, cannot check for duplicates');
+      return false;
+    }
+
+    // Iterate through all faculties and their departments
+    for (const [, facultyInfo] of Object.entries(facultyData)) {
+      const facultyAlias = facultyInfo.alias;
+      const departments = facultyInfo.departments || [];
+
+      // Check each department in this faculty
+      for (const department of departments) {
+        const docPath = `student-information-form/form-values/${facultyAlias}/${department}/submissions/${studentId}`;
+        const docRef = doc(db, docPath);
+        const docSnapshot = await getDoc(docRef);
+
+        // If document exists, a submission is already present
+        if (docSnapshot.exists()) {
+          return true;
+        }
+      }
+    }
+
+    // No submission found in any faculty/department
+    return false;
   } catch (error) {
     console.error('Error checking duplicate submission:', error);
-    // If there's an error, we'll allow the submission to proceed
-    // This prevents the form from being completely blocked
+    // If there's an error, return false to allow submission
+    // In production, consider logging this for monitoring
     return false;
   }
 };
@@ -204,7 +227,7 @@ export const checkDuplicateSubmission = async (studentId) => {
  */
 export const saveStudentForm = async (formData, facultyData) => {
   try {
-    const { studentId, firstName, lastName, session, faculty, department, phoneNumber, email, aliasEmail, yearSemesterType, yearSemesterValue, agreeToTerms } = formData;
+    const { studentId, firstName, lastName, session, faculty, department, degreeLevel, phoneNumber, email, aliasEmail, yearSemesterType, yearSemesterValue, agreeToTerms } = formData;
 
     // Convert faculty name to alias
     let facultyAlias = faculty;
@@ -224,6 +247,7 @@ export const saveStudentForm = async (formData, facultyData) => {
       faculty, // Store full faculty name for display
       facultyAlias, // Store alias for reference
       department,
+      degreeLevel: degreeLevel || 'Bachelor', // Default to Bachelor if not provided
       phoneNumber,
       email,
       aliasEmail,
