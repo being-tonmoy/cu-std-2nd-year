@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }) => {
 
       // Set new session timeout
       const timer = setTimeout(() => {
-        console.log('Session expired after 12 hours');
+        // console.log('Session expired after 12 hours');
         logoutDueToTimeout();
       }, SESSION_TIMEOUT);
 

@@ -44,7 +44,7 @@ const AcademicInformation = ({
 
   // Debug wrapper for onChange
   const handleSelectChange = (e) => {
-    console.log('Select changed:', e.target.name, '=', e.target.value);
+    // console.log('Select changed:', e.target.name, '=', e.target.value);
     onInputChange(e);
   };
 

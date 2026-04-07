@@ -6,6 +6,7 @@ import AdminSetup from '../pages/AdminSetup';
 import UserManagement from '../pages/UserManagement';
 import SubmissionManagement from '../pages/SubmissionManagement';
 import AdminComplaints from '../pages/AdminComplaints';
+import StudentDataManager from '../components/StudentDataManager';
 
 const adminRoutes = [
   <Route
@@ -50,6 +51,15 @@ const adminRoutes = [
     element={
       <ProtectedRoute requiredRole="admin">
         <AdminComplaints />
+      </ProtectedRoute>
+    }
+  />,
+  <Route
+    key="students"
+    path="/admin/students"
+    element={
+      <ProtectedRoute requiredRole="superadmin">
+        <StudentDataManager />
       </ProtectedRoute>
     }
   />,

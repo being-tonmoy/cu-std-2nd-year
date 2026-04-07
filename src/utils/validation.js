@@ -196,43 +196,16 @@ export const generatePassword = (length = 12) => {
   return password.split('').sort(() => Math.random() - 0.5).join('');
 };
 
-// Check if student ID exists in CSV file
-// Uses early-break: stops searching as soon as ID is found
+// Check if student ID exists in Firebase eligible-students collection
+// Replaced CSV check with Firebase Firestore for better performance and management
 export const checkStudentIdInCSV = async (studentId) => {
   try {
-    const response = await fetch('/students.csv');
-    
-    if (!response.ok) {
-      throw new Error('Failed to load CSV file');
-    }
-    const csvText = await response.text();
-    
-    // Parse CSV: split by lines (handle both \r\n and \n)
-    const lines = csvText.split(/\r?\n/);
-    
-    // Skip header row (line 0), iterate through CSV lines
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      // Skip empty lines
-      if (!line) continue;
-      
-      const columns = line.split(',');
-      if (columns.length > 0) {
-        const id = columns[0].trim();
-        // Found the student ID, return true immediately
-        if (id === studentId) {
-          // console.log(`CSV Check - Student ID: ${studentId}, Found: true`);
-          return true;
-        }
-      }
-    }
-
-    // Student ID not found in CSV
-    // console.log(`CSV Check - Student ID: ${studentId}, Found: false`);
-    return false;
+    const { checkStudentExists } = await import('../services/firestoreService');
+    const studentExists = await checkStudentExists(studentId);
+    return studentExists;
   } catch (error) {
-    console.error('Error checking student ID in CSV:', error);
-    // If we can't load the CSV, allow the submission
+    console.error('Error checking student ID in Firebase:', error);
+    // If we can't connect to Firebase, allow the submission
     return true;
   }
 };

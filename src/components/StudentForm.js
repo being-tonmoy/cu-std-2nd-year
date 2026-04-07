@@ -27,6 +27,7 @@ import {
   getFacultyData,
   getMaintenanceStatus
 } from '../services/firestoreService';
+import { sendApplicationFormSubmissionEmail } from '../services/emailService';
 import PersonalInformation from './StudentForm/PersonalInformation';
 import AcademicInformation from './StudentForm/AcademicInformation';
 import TermsAndConditions from './StudentForm/TermsAndConditions';
@@ -71,7 +72,7 @@ const StudentForm = () => {
     try {
       const response = await fetch('/students.csv');
       if (response.ok) {
-        console.log('CSV preloaded successfully');
+        // console.log('CSV preloaded successfully');
       }
     } catch (error) {
       console.error('Error preloading CSV:', error);
@@ -261,7 +262,47 @@ const StudentForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Check for duplicate submission first
+    // VALIDATE FORM FIELDS FIRST
+    if (!validateForm()) {
+      // Get field names with errors
+      const errorFields = Object.keys(errors).filter(key => errors[key]);
+      const fieldLabels = {
+        firstName: 'First Name',
+        lastName: 'Last Name',
+        studentId: 'Student ID',
+        session: 'Session',
+        faculty: 'Faculty',
+        department: 'Department',
+        degreeLevel: 'Degree Level',
+        phoneNumber: 'Phone Number',
+        email: 'Email',
+        aliasEmail: 'Alias Email',
+        yearSemesterValue: 'Year/Semester',
+        agreeToTerms: 'Terms and Conditions'
+      };
+      
+      // Build detailed error message with specific error details
+      let errorMessage = '';
+      if (errorFields.length > 0) {
+        errorMessage = errorFields.map(f => {
+          const label = fieldLabels[f] || f;
+          const detail = errors[f];
+          return `<strong>${label}:</strong> ${detail}`;
+        }).join('<br/><br/>');
+      } else {
+        errorMessage = 'Please correct the errors in the form';
+      }
+
+      Swal.fire({
+        icon: 'error',
+        title: language === 'en' ? 'Validation Error' : 'বৈধতা ত্রুটি',
+        html: language === 'en' ? errorMessage : 'ফর্মের ত্রুটিগুলি সংশোধন করুন',
+        confirmButtonColor: '#001f3f'
+      });
+      return;
+    }
+
+    // THEN, check for duplicate submission in Firestore
     if (validateStudentId(formData.studentId)) {
       setLoading(true);
       try {
@@ -307,7 +348,7 @@ const StudentForm = () => {
       setLoading(false);
     }
 
-    // Check student ID in CSV (only for Bachelor and Masters, not M.Phil/PhD)
+    // THEN, check student ID in Firebase (only for Bachelor and Masters, not M.Phil/PhD)
     if (validateStudentId(formData.studentId) && (formData.degreeLevel === 'Bachelor' || formData.degreeLevel === 'Masters')) {
       setLoading(true);
       try {
@@ -338,49 +379,10 @@ const StudentForm = () => {
           return;
         }
       } catch (error) {
-        console.error('Error checking student ID in CSV:', error);
-        // Continue with submission even if CSV check fails due to network issues
+        console.error('Error checking student ID in Firebase:', error);
+        // Continue with submission even if Firebase check fails due to network issues
       }
       setLoading(false);
-    }
-
-    if (!validateForm()) {
-      // Get field names with errors
-      const errorFields = Object.keys(errors).filter(key => errors[key]);
-      const fieldLabels = {
-        firstName: 'First Name',
-        lastName: 'Last Name',
-        studentId: 'Student ID',
-        session: 'Session',
-        faculty: 'Faculty',
-        department: 'Department',
-        degreeLevel: 'Degree Level',
-        phoneNumber: 'Phone Number',
-        email: 'Email',
-        aliasEmail: 'Alias Email',
-        yearSemesterValue: 'Year/Semester',
-        agreeToTerms: 'Terms and Conditions'
-      };
-      
-      // Build detailed error message with specific error details
-      let errorMessage = '';
-      if (errorFields.length > 0) {
-        errorMessage = errorFields.map(f => {
-          const label = fieldLabels[f] || f;
-          const detail = errors[f];
-          return `<strong>${label}:</strong> ${detail}`;
-        }).join('<br/><br/>');
-      } else {
-        errorMessage = 'Please correct the errors in the form';
-      }
-
-      Swal.fire({
-        icon: 'error',
-        title: language === 'en' ? 'Validation Error' : 'বৈধতা ত্রুটি',
-        html: language === 'en' ? errorMessage : 'ফর্মের ত্রুটিগুলি সংশোধন করুন',
-        confirmButtonColor: '#001f3f'
-      });
-      return;
     }
 
     setLoading(true);
@@ -388,6 +390,9 @@ const StudentForm = () => {
     try {
       // Save form data with faculty data for alias conversion
       await saveStudentForm(formData, facultyData);
+
+      // Send confirmation email to student
+      await sendApplicationFormSubmissionEmail(formData, formData.email);
 
       Swal.fire({
         icon: 'success',

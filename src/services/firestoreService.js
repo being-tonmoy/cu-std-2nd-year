@@ -10,7 +10,8 @@ import {
   serverTimestamp,
   collectionGroup,
   updateDoc,
-  deleteDoc
+  deleteDoc,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from '../utils/firebase';
 
@@ -695,6 +696,311 @@ export const getMaintenanceStatus = async () => {
   } catch (error) {
     console.error('Error getting maintenance status:', error);
     return false;
+  }
+};
+
+// ==================== STUDENT DATA MANAGEMENT ====================
+
+/**
+ * Add or update a student record in the eligible-students collection
+ * Each student ID is stored as a separate document for easy lookup
+ * @param {object} studentData - Student data with fields: student_id, name, subject, faculty
+ */
+export const addStudentData = async (studentData) => {
+  try {
+    const { student_id, name, subject, faculty } = studentData;
+    
+    if (!student_id) {
+      throw new Error('student_id is required');
+    }
+
+    const studentsRef = collection(db, 'eligible-students');
+    const docRef = doc(studentsRef, student_id);
+
+    const dataToSave = {
+      student_id,
+      name: name || '',
+      subject: subject || '',
+      faculty: faculty || '',
+      addedAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    };
+
+    await setDoc(docRef, dataToSave, { merge: true });
+
+    return {
+      success: true,
+      message: 'Student data saved successfully'
+    };
+  } catch (error) {
+    console.error('Error adding student data:', error);
+    throw error;
+  }
+};
+
+/**
+ * Check if a student ID exists in the eligible-students collection
+ * @param {string} studentId - The student ID to check
+ * @returns {Promise<boolean>} - True if student exists, false otherwise
+ */
+export const checkStudentExists = async (studentId) => {
+  try {
+    const studentRef = doc(db, 'eligible-students', studentId);
+    const studentDoc = await getDoc(studentRef);
+    return studentDoc.exists();
+  } catch (error) {
+    console.error('Error checking student existence:', error);
+    // Return true on error to be lenient (allow submission if check fails)
+    return true;
+  }
+};
+
+/**
+ * Get student data by ID
+ * @param {string} studentId - The student ID
+ * @returns {Promise<object|null>} - Student data or null if not found
+ */
+export const getStudentData = async (studentId) => {
+  try {
+    const studentRef = doc(db, 'eligible-students', studentId);
+    const studentDoc = await getDoc(studentRef);
+    
+    if (studentDoc.exists()) {
+      return {
+        id: studentDoc.id,
+        ...studentDoc.data()
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting student data:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get all eligible students
+ * @returns {Promise<array>} - Array of student records
+ */
+export const getAllStudents = async () => {
+  try {
+    const studentsRef = collection(db, 'eligible-students');
+    const querySnapshot = await getDocs(studentsRef);
+    
+    const students = [];
+    querySnapshot.forEach((doc) => {
+      students.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    // Sort by student_id
+    students.sort((a, b) => a.student_id.localeCompare(b.student_id));
+    
+    return students;
+  } catch (error) {
+    console.error('Error getting all students:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update student data
+ * @param {string} studentId - The student ID
+ * @param {object} updateData - The data to update
+ */
+export const updateStudentData = async (studentId, updateData) => {
+  try {
+    const studentRef = doc(db, 'eligible-students', studentId);
+    
+    const dataToUpdate = {
+      ...updateData,
+      updatedAt: Timestamp.now()
+    };
+
+    await updateDoc(studentRef, dataToUpdate);
+
+    return {
+      success: true,
+      message: 'Student data updated successfully'
+    };
+  } catch (error) {
+    console.error('Error updating student data:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete student data
+ * @param {string} studentId - The student ID to delete
+ */
+export const deleteStudentData = async (studentId) => {
+  try {
+    const studentRef = doc(db, 'eligible-students', studentId);
+    await deleteDoc(studentRef);
+
+    return {
+      success: true,
+      message: 'Student data deleted successfully'
+    };
+  } catch (error) {
+    console.error('Error deleting student data:', error);
+    throw error;
+  }
+};
+
+/**
+ * Batch import students from CSV data
+ * @param {array} csvData - Array of student objects with: student_id, name, subject, faculty
+ * @returns {Promise<object>} - Import statistics
+ */
+export const importStudentsFromCSV = async (csvData) => {
+  try {
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    for (const studentData of csvData) {
+      try {
+        await addStudentData(studentData);
+        successCount++;
+      } catch (error) {
+        errorCount++;
+        errors.push({
+          studentId: studentData.student_id,
+          error: error.message
+        });
+      }
+    }
+
+    return {
+      success: true,
+      message: `Import completed: ${successCount} successful, ${errorCount} failed`,
+      successCount,
+      errorCount,
+      errors: errors.length > 0 ? errors : null
+    };
+  } catch (error) {
+    console.error('Error importing students:', error);
+    throw error;
+  }
+};
+
+/**
+ * Improved batch import students from CSV - only uploads new documents (no duplicates)
+ * Processes in batches of 500 rows to avoid network/quota issues
+ * 
+ * @param {array} csvData - Array of student objects: {student_id, name, subject, faculty}
+ * @param {Function} onProgress - Optional callback for progress updates. Called with {current, total, message}
+ * @returns {Promise<object>} - Import statistics with skipped count
+ * 
+ * @example
+ * const result = await importStudentsFromCSVBatched(csvData, (progress) => {
+ *   console.log(`${progress.current}/${progress.total}: ${progress.message}`);
+ * });
+ */
+export const importStudentsFromCSVBatched = async (csvData, onProgress = null) => {
+  try {
+    const BATCH_SIZE = 500;
+    const DELAY_BETWEEN_BATCHES = 1000; // 1 second delay between batches
+    
+    let successCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    // Step 1: Get all existing student IDs to verify which ones need to be uploaded
+    const reportProgress = (message) => {
+      if (onProgress) {
+        onProgress({
+          current: successCount + skippedCount + errorCount,
+          total: csvData.length,
+          message
+        });
+      }
+    };
+
+    reportProgress('Checking for existing students...');
+    const studentsRef = collection(db, 'eligible-students');
+    const existingSnapshot = await getDocs(studentsRef);
+    const existingIds = new Set(existingSnapshot.docs.map(doc => doc.id));
+    
+    // Step 2: Filter out students that already exist
+    const newStudents = csvData.filter(student => {
+      if (existingIds.has(student.student_id)) {
+        skippedCount++;
+        return false;
+      }
+      return true;
+    });
+
+    reportProgress(`Found ${skippedCount} existing students. Will import ${newStudents.length} new students...`);
+
+    // Step 3: Process in batches of 500
+    for (let i = 0; i < newStudents.length; i += BATCH_SIZE) {
+      const batch = newStudents.slice(i, i + BATCH_SIZE);
+      const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(newStudents.length / BATCH_SIZE);
+
+      reportProgress(`Uploading batch ${batchNumber}/${totalBatches} (${batch.length} students)...`);
+
+      // Use writeBatch for efficient atomic writes
+      const writeBatchRef = writeBatch(db);
+
+      for (const studentData of batch) {
+        try {
+          const { student_id, name, subject, faculty } = studentData;
+          
+          if (!student_id) {
+            throw new Error('student_id is required');
+          }
+
+          const docRef = doc(studentsRef, student_id);
+          const dataToSave = {
+            student_id,
+            name: name || '',
+            subject: subject || '',
+            faculty: faculty || '',
+            addedAt: Timestamp.now(),
+            updatedAt: Timestamp.now()
+          };
+
+          writeBatchRef.set(docRef, dataToSave);
+          successCount++;
+        } catch (error) {
+          errorCount++;
+          errors.push({
+            studentId: studentData.student_id,
+            error: error.message
+          });
+        }
+      }
+
+      // Commit the batch
+      await writeBatchRef.commit();
+
+      // Add delay between batches to avoid overwhelming the API
+      if (i + BATCH_SIZE < newStudents.length) {
+        reportProgress(`Batch ${batchNumber} uploaded. Waiting before next batch...`);
+        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
+      }
+    }
+
+    reportProgress('Import completed!');
+
+    return {
+      success: true,
+      message: `Import completed: ${successCount} new students added, ${skippedCount} skipped (already exist), ${errorCount} failed`,
+      successCount,
+      skippedCount,
+      errorCount,
+      total: csvData.length,
+      errors: errors.length > 0 ? errors : null
+    };
+  } catch (error) {
+    console.error('Error importing students:', error);
+    throw error;
   }
 };
 

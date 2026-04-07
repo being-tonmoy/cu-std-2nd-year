@@ -191,7 +191,7 @@ const AdminDashboard = () => {
               Welcome, <strong>{user?.name}</strong> ({user?.role})
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <Button
               variant="outlined"
               onClick={() => navigate('/admin/setup')}
@@ -205,6 +205,13 @@ const AdminDashboard = () => {
               sx={{ borderColor: '#003d7a', color: '#003d7a', fontWeight: 'bold' }}
             >
               Manage Submissions
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => navigate('/admin/students')}
+              sx={{ borderColor: '#0288d1', color: '#0288d1', fontWeight: 'bold' }}
+            >
+              Manage Students
             </Button>
             <Button
               variant="outlined"
