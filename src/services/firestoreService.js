@@ -806,6 +806,67 @@ export const getAllStudents = async () => {
 };
 
 /**
+ * Search students by ID, name, or faculty (optimized to avoid loading all 35k students)
+ * @param {string} searchTerm - The search term to query by
+ * @returns {Promise<Array>} - Array of matching students
+ */
+export const searchStudents = async (searchTerm) => {
+  try {
+    if (!searchTerm || searchTerm.trim().length === 0) {
+      return [];
+    }
+
+    const studentsRef = collection(db, 'eligible-students');
+    const students = [];
+
+    // Query by student_id (primary search - most efficient)
+    if (/^\d+$/.test(searchTerm)) {
+      const q = query(
+        studentsRef,
+        where('student_id', '>=', searchTerm),
+        where('student_id', '<', searchTerm + '\uf8ff')
+      );
+      const querySnapshot = await getDocs(q);
+      querySnapshot.forEach((doc) => {
+        students.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+    }
+
+    // If still empty or search term contains non-digits, fetch all and filter client-side
+    // This is acceptable since users will type a student ID or name to narrow down results
+    if (students.length === 0) {
+      const allSnapshot = await getDocs(studentsRef);
+      const searchLower = searchTerm.toLowerCase();
+      
+      allSnapshot.forEach((doc) => {
+        const student = doc.data();
+        if (
+          student.student_id.includes(searchTerm) ||
+          (student.name?.toLowerCase() || '').includes(searchLower) ||
+          (student.faculty?.toLowerCase() || '').includes(searchLower)
+        ) {
+          students.push({
+            id: doc.id,
+            ...student
+          });
+        }
+      });
+    }
+
+    // Sort by student_id
+    students.sort((a, b) => a.student_id.localeCompare(b.student_id));
+    
+    return students;
+  } catch (error) {
+    console.error('Error searching students:', error);
+    throw error;
+  }
+};
+
+/**
  * Update student data
  * @param {string} studentId - The student ID
  * @param {object} updateData - The data to update

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Container,
@@ -35,7 +35,7 @@ import BlockIcon from '@mui/icons-material/Block';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import {
-  getAllStudents,
+  searchStudents,
   addStudentData,
   updateStudentData,
   deleteStudentData,
@@ -47,8 +47,9 @@ const StudentDataManager = () => {
   const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [submissions, setSubmissions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
   const [order, setOrder] = useState('asc');
   const [orderBy, setOrderBy] = useState('student_id');
   const [page, setPage] = useState(0);
@@ -62,31 +63,53 @@ const StudentDataManager = () => {
     faculty: ''
   });
 
-  // Load students and submissions on mount
+  // Load submissions on mount only
   useEffect(() => {
-    loadData();
+    loadSubmissions();
   }, []);
 
-  const loadData = async () => {
+  const loadSubmissions = async () => {
     try {
-      setLoading(true);
-      const [studentData, submissionData] = await Promise.all([
-        getAllStudents(),
-        getAllSubmissions()
-      ]);
-      setStudents(studentData);
+      const submissionData = await getAllSubmissions();
       setSubmissions(submissionData || []);
     } catch (error) {
-      console.error('Error loading data:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Failed to load student data'
-      });
-    } finally {
-      setLoading(false);
+      console.error('Error loading submissions:', error);
     }
   };
+
+  const performSearch = useCallback(async () => {
+    try {
+      setSearchLoading(true);
+      const studentData = await searchStudents(searchTerm);
+      setStudents(studentData);
+      setHasSearched(true);
+      setPage(0);
+    } catch (error) {
+      console.error('Error searching students:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Search Error',
+        text: 'Failed to search students'
+      });
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [searchTerm]);
+
+  // Search students whenever search term changes (with debounce)
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      if (searchTerm.trim().length > 0) {
+        performSearch();
+      } else {
+        setStudents([]);
+        setHasSearched(false);
+        setPage(0);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(debounceTimer);
+  }, [searchTerm, performSearch]);
 
   // Check if eligible student's faculty matches any submission's department
   const getStudentVerification = (student) => {
@@ -108,11 +131,8 @@ const StudentDataManager = () => {
     return { matched: false, message: 'Mismatch' };
   };
 
-  const filteredStudents = students.filter(student =>
-    student.student_id.includes(searchTerm) ||
-    (student.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (student.faculty?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-  );
+  // Since students array now only contains search results, no need to filter
+  const filteredStudents = students;
 
   const handleRequestSort = (property) => {
     const isAsc = orderBy === property && order === 'asc';
@@ -194,7 +214,10 @@ const StudentDataManager = () => {
         });
       }
       handleCloseDialog();
-      loadData();
+      // Refresh search results if there's an active search
+      if (hasSearched && searchTerm.trim().length > 0) {
+        performSearch();
+      }
     } catch (error) {
       console.error('Error saving student:', error);
       Swal.fire({
@@ -218,7 +241,6 @@ const StudentDataManager = () => {
 
     if (result.isConfirmed) {
       try {
-        setLoading(true);
         await deleteStudentData(studentId);
         Swal.fire({
           icon: 'success',
@@ -227,7 +249,10 @@ const StudentDataManager = () => {
           timer: 2000,
           confirmButtonColor: '#001f3f'
         });
-        loadData();
+        // Refresh search results if there's an active search
+        if (hasSearched && searchTerm.trim().length > 0) {
+          performSearch();
+        }
       } catch (error) {
         console.error('Error deleting student:', error);
         Swal.fire({
@@ -235,8 +260,6 @@ const StudentDataManager = () => {
           title: 'Error',
           text: 'Failed to delete student'
         });
-      } finally {
-        setLoading(false);
       }
     }
   };
@@ -289,8 +312,6 @@ const StudentDataManager = () => {
         });
 
         if (result.isConfirmed) {
-          setLoading(true);
-          
           // Show progress dialog
           Swal.fire({
             title: 'Importing Students',
@@ -321,7 +342,10 @@ const StudentDataManager = () => {
                   confirmButtonColor: '#001f3f'
                 });
 
-                loadData();
+                // Refresh search results if there's an active search
+                if (hasSearched && searchTerm.trim().length > 0) {
+                  performSearch();
+                }
               } catch (error) {
                 console.error('Error during import:', error);
                 Swal.fire({
@@ -330,8 +354,6 @@ const StudentDataManager = () => {
                   text: error.message,
                   confirmButtonColor: '#001f3f'
                 });
-              } finally {
-                setLoading(false);
               }
             }
           });
@@ -425,19 +447,25 @@ const StudentDataManager = () => {
 
       {/* Results Count */}
       <Box sx={{ mb: 2 }}>
-        <Typography variant="body2" sx={{ color: '#666' }}>
-          Found: <strong>{filteredStudents.length}</strong> student(s)
-        </Typography>
+        {hasSearched && (
+          <Typography variant="body2" sx={{ color: '#666' }}>
+            Found: <strong>{filteredStudents.length}</strong> student(s)
+          </Typography>
+        )}
       </Box>
 
       {/* Table */}
-      {loading ? (
+      {searchLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress />
         </Box>
+      ) : !hasSearched ? (
+        <Alert severity="info">
+          Start typing a student ID, name, or faculty to search for eligible students. This helps prevent exceeding Firebase quotas.
+        </Alert>
       ) : filteredStudents.length === 0 ? (
         <Alert severity="info">
-          {searchTerm ? 'No students match your search criteria.' : 'No eligible students found. Add students or import a CSV file.'}
+          No students match your search criteria.
         </Alert>
       ) : (
         <>
