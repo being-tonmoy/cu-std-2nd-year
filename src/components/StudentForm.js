@@ -22,7 +22,10 @@ import {
   checkStudentIdInCSV
 } from '../utils/validation';
 import { 
-  checkDuplicateSubmission, 
+  checkDuplicateSubmission,
+  checkEligibleStudent,
+  validateEligibleStudentInfo,
+  checkDuplicateSubmissionOptimized,
   saveStudentForm,
   getFacultyData,
   getMaintenanceStatus
@@ -262,7 +265,7 @@ const StudentForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // VALIDATE FORM FIELDS FIRST
+    // STEP 1: VALIDATE FORM FIELDS FIRST
     if (!validateForm()) {
       // Get field names with errors
       const errorFields = Object.keys(errors).filter(key => errors[key]);
@@ -302,55 +305,163 @@ const StudentForm = () => {
       return;
     }
 
-    // THEN, check for duplicate submission in Firestore
-    if (validateStudentId(formData.studentId)) {
-      setLoading(true);
-      try {
-        const isDuplicate = await checkDuplicateSubmission(formData.studentId);
-        if (isDuplicate) {
-          Swal.fire({
-            icon: 'error',
-            title: language === 'en' ? 'Application Already Exists' : 'আবেদন ইতিমধ্যে জমা দেওয়া হয়েছে',
-            html: language === 'en'
-              ? `<p style="text-align: left;">There is already an application for the student ID <strong>${formData.studentId}</strong> in our system.</p>
-                  <p style="text-align: left; margin-top: 15px;">If you have mistakenly submitted or need to update your information, please contact the ICT Cell, CU:</p>
-                  </br>
-                  <p style="text-align: left;">
-                    <strong>Email:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
-                    <strong>Visit:</strong> ICT Cell, IT Bhaban, University of Chittagong, Chittagong
-                  </p>`
-              : `<p style="text-align: left;">শিক্ষার্থী আইডি <strong>${formData.studentId}</strong> এর জন্য আমাদের সিস্টেমে ইতিমধ্যে একটি আবেদন রয়েছে।</p>
-                  <p style="text-align: left; margin-top: 15px;">যদি আপনি ভুলবশত জমা দিয়ে থাকেন বা আপনার তথ্য আপডেট করতে চান, তবে আই সি টি সেল, চট্টগ্রাম বিশ্ববিদ্যালয়-এ যোগাযোগ করুন:</p>
-                  </br>
-                  <p style="text-align: left;">
-                    <strong>ইমেইল:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
-                    <strong>ভিজিট করুন:</strong> আই সি টি সেল, আই টি ভবন, চট্টগ্রাম বিশ্ববিদ্যালয়, চট্টগ্রাম
-                  </p>`,
-            confirmButtonColor: '#001f3f',
-            allowOutsideClick: false
-          });
-          setLoading(false);
-          return;
-        }
-      } catch (error) {
-        console.error('Error checking submission:', error);
+    // STEP 2: CHECK IF STUDENT IS ELIGIBLE (1 database read)
+    setLoading(true);
+    try {
+      const isEligible = await checkEligibleStudent(formData.studentId);
+      if (!isEligible) {
         Swal.fire({
           icon: 'error',
-          title: language === 'en' ? 'Error' : 'ত্রুটি',
-          text: language === 'en' 
-            ? 'Unable to verify if an application already exists. Please try again.' 
-            : 'আবেদন যাচাই করতে সক্ষম নই। আবার চেষ্টা করুন।',
-          confirmButtonColor: '#001f3f'
+          title: language === 'en' ? 'Not Eligible' : 'যোগ্য নন',
+          html: language === 'en' 
+            ? `<p style="text-align: left;">Your student ID <strong>${formData.studentId}</strong> is not in the eligible list for this program.</p>
+                <p style="text-align: left; margin-top: 15px;">Please contact the ICT Cell, CU:</p>
+                </br>
+                <p style="text-align: left;">
+                  <strong>Email:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
+                  <strong>Visit:</strong> ICT Cell, IT Bhaban, University of Chittagong, Chittagong
+                </p>`
+            : `<p style="text-align: left;">আপনার শিক্ষার্থী আইডি <strong>${formData.studentId}</strong> এই প্রোগ্রামের যোগ্য তালিকায় নেই।</p>
+                <p style="text-align: left; margin-top: 15px;">দয়া করে আই সি টি সেল, চট্টগ্রাম বিশ্ববিদ্যালয়-এ যোগাযোগ করুন:</p>
+                </br>
+                <p style="text-align: left;">
+                  <strong>ইমেইল:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
+                  <strong>ভিজিট করুন:</strong> আই সি টি সেল, আই টি ভবন, চট্টগ্রাম বিশ্ববিদ্যালয়, চট্টগ্রাম
+                </p>`,
+          confirmButtonColor: '#001f3f',
+          allowOutsideClick: false
         });
         setLoading(false);
         return;
       }
+    } catch (error) {
+      console.error('Error checking eligible student:', error);
+      Swal.fire({
+        icon: 'error',
+        title: language === 'en' ? 'Error' : 'ত্রুটি',
+        text: language === 'en' 
+          ? 'Unable to verify eligibility. Please try again.' 
+          : 'যোগ্যতা যাচাই করতে সক্ষম নই। আবার চেষ্টা করুন।',
+        confirmButtonColor: '#001f3f'
+      });
       setLoading(false);
+      return;
     }
 
-    // THEN, check student ID in Firebase (only for Bachelor and Masters, not M.Phil/PhD)
+    // STEP 2.5: VALIDATE FACULTY AND DEPARTMENT MATCH WITH ELIGIBLE STUDENT DATA
+    try {
+      // console.log('🚀 Starting faculty/department validation...');
+      // console.log('📋 Current form data:', {
+      //   studentId: formData.studentId,
+      //   faculty: formData.faculty,
+      //   department: formData.department
+      // });
+      // console.log('📊 Faculty data available:', facultyData ? 'YES' : 'NO');
+
+      const validationResult = await validateEligibleStudentInfo(
+        formData.studentId,
+        formData.faculty,
+        formData.department,
+        facultyData
+      );
+
+      if (!validationResult.valid) {
+        Swal.fire({
+          icon: 'error',
+          title: language === 'en' ? 'Information Mismatch' : 'তথ্য মেলে না',
+          html: language === 'en'
+            ? `<p style="text-align: left;">The faculty and department you selected do not match the information in our system.</p>
+                <p style="text-align: left; margin-top: 15px;">Please ensure you have selected the correct faculty and department, and try again. If the problem persists, please contact the ICT Cell, CU:</p>
+                </br>
+                <p style="text-align: left;">
+                  <strong>Email:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
+                  <strong>Visit:</strong> ICT Cell, IT Bhaban, University of Chittagong, Chittagong
+                </p>`
+            : `<p style="text-align: left;">আপনার নির্বাচিত ফ্যাকাল্টি এবং বিভাগ আমাদের সিস্টেমের তথ্যের সাথে মেলে না।</p>
+                <p style="text-align: left; margin-top: 15px;">দয়া করে নিশ্চিত করুন যে আপনি সঠিক ফ্যাকাল্টি এবং বিভাগ নির্বাচন করেছেন এবং আবার চেষ্টা করুন। সমস্যা বজায় থাকলে, দয়া করে আই সি টি সেল, চট্টগ্রাম বিশ্ববিদ্যালয়-এ যোগাযোগ করুন:</p>
+                </br>
+                <p style="text-align: left;">
+                  <strong>ইমেইল:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
+                  <strong>ভিজিট করুন:</strong> আই সি টি সেল, আী টি ভবন, চট্টগ্রাম বিশ্ববিদ্যালয়, চট্টগ্রাম
+                </p>`,
+          confirmButtonColor: '#001f3f',
+          allowOutsideClick: false
+        });
+        setLoading(false);
+        return;
+      }
+    } catch (error) {
+      console.error('Error validating eligible student info:', error);
+      Swal.fire({
+        icon: 'error',
+        title: language === 'en' ? 'Error' : 'ত্রুটি',
+        text: language === 'en' 
+          ? 'Unable to validate faculty and department information. Please try again.' 
+          : 'ফ্যাকাল্টি এবং বিভাগের তথ্য যাচাই করতে সক্ষম নই। আবার চেষ্টা করুন।',
+        confirmButtonColor: '#001f3f'
+      });
+      setLoading(false);
+      return;
+    }
+
+    // STEP 3: CHECK FOR DUPLICATE SUBMISSION IN SELECTED FACULTY/DEPARTMENT ONLY (1 database read)
+    try {
+      // Get faculty alias from facultyData
+      let facultyAlias = formData.faculty;
+      if (facultyData && typeof facultyData === 'object') {
+        const facultyObj = Object.values(facultyData).find(f => f && f.name === formData.faculty);
+        if (facultyObj && facultyObj.alias) {
+          facultyAlias = facultyObj.alias;
+        }
+      }
+
+      const isDuplicate = await checkDuplicateSubmissionOptimized(
+        formData.studentId,
+        facultyAlias,
+        formData.department
+      );
+      
+      if (isDuplicate) {
+        Swal.fire({
+          icon: 'error',
+          title: language === 'en' ? 'Application Already Exists' : 'আবেদন ইতিমধ্যে জমা দেওয়া হয়েছে',
+          html: language === 'en'
+            ? `<p style="text-align: left;">There is already an application for the student ID <strong>${formData.studentId}</strong> in our system.</p>
+                <p style="text-align: left; margin-top: 15px;">If you have mistakenly submitted or need to update your information, please contact the ICT Cell, CU:</p>
+                </br>
+                <p style="text-align: left;">
+                  <strong>Email:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
+                  <strong>Visit:</strong> ICT Cell, IT Bhaban, University of Chittagong, Chittagong
+                </p>`
+            : `<p style="text-align: left;">শিক্ষার্থী আইডি <strong>${formData.studentId}</strong> এর জন্য আমাদের সিস্টেমে ইতিমধ্যে একটি আবেদন রয়েছে।</p>
+                <p style="text-align: left; margin-top: 15px;">যদি আপনি ভুলবশত জমা দিয়ে থাকেন বা আপনার তথ্য আপডেট করতে চান, তবে আই সি টি সেল, চট্টগ্রাম বিশ্ববিদ্যালয়-এ যোগাযোগ করুন:</p>
+                </br>
+                <p style="text-align: left;">
+                  <strong>ইমেইল:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
+                  <strong>ভিজিট করুন:</strong> আই সি টি সেল, আই টি ভবন, চট্টগ্রাম বিশ্ববিদ্যালয়, চট্টগ্রাম
+                </p>`,
+          confirmButtonColor: '#001f3f',
+          allowOutsideClick: false
+        });
+        setLoading(false);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking duplicate submission:', error);
+      Swal.fire({
+        icon: 'error',
+        title: language === 'en' ? 'Error' : 'ত্রুটি',
+        text: language === 'en' 
+          ? 'Unable to verify if an application already exists. Please try again.' 
+          : 'আবেদন যাচাই করতে সক্ষম নই। আবার চেষ্টা করুন।',
+        confirmButtonColor: '#001f3f'
+      });
+      setLoading(false);
+      return;
+    }
+
+    // STEP 4: CHECK STUDENT ID IN CSV (if applicable)
     if (validateStudentId(formData.studentId) && (formData.degreeLevel === 'Bachelor' || formData.degreeLevel === 'Masters')) {
-      setLoading(true);
       try {
         const idExists = await checkStudentIdInCSV(formData.studentId);
         if (!idExists) {
@@ -379,14 +490,12 @@ const StudentForm = () => {
           return;
         }
       } catch (error) {
-        console.error('Error checking student ID in Firebase:', error);
-        // Continue with submission even if Firebase check fails due to network issues
+        console.error('Error checking student ID in CSV:', error);
+        // Continue with submission even if CSV check fails due to network issues
       }
-      setLoading(false);
     }
 
-    setLoading(true);
-
+    // STEP 5: SAVE FORM DATA AND SEND EMAIL
     try {
       // Save form data with faculty data for alias conversion
       await saveStudentForm(formData, facultyData);

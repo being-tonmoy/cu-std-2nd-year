@@ -173,10 +173,149 @@ export const getAllAdminUsers = async () => {
 };
 
 /**
+ * Check if student is in eligible-students collection
+ * OPTIMIZED: Only 1 database read instead of checking multiple collections
+ * @param {string} studentId - The student ID to check
+ * @returns {Promise<boolean>} - True if student is eligible, false otherwise
+ */
+export const checkEligibleStudent = async (studentId) => {
+  try {
+    const eligibleStudentDoc = await getDoc(doc(db, 'eligible-students', studentId));
+    return eligibleStudentDoc.exists();
+  } catch (error) {
+    console.error('Error checking eligible student:', error);
+    throw error;
+  }
+};
+
+/**
+ * Normalize department/subject names by handling & vs "and" variations
+ * @param {string} text - The text to normalize
+ * @returns {string} - Normalized text
+ */
+const normalizeDepartmentName = (text) => {
+  if (!text) return '';
+  // Replace & with "and" and trim
+  return text.trim().toLowerCase().replace(/&/g, 'and').replace(/\s+/g, ' ');
+};
+
+/**
+ * Get eligible student data and verify faculty/department match
+ * @param {string} studentId - The student ID to check
+ * @param {string} selectedFacultyName - The selected faculty name from form (full name)
+ * @param {string} selectedDepartment - The selected department from form
+ * @param {object} facultyData - Faculty data with aliases and departments
+ * @returns {Promise<{valid: boolean, error: string}>} - Validation result
+ */
+export const validateEligibleStudentInfo = async (studentId, selectedFacultyName, selectedDepartment, facultyData) => {
+  try {
+    // Get eligible student document
+    const eligibleDoc = await getDoc(doc(db, 'eligible-students', studentId));
+    
+    if (!eligibleDoc.exists()) {
+      // console.log('❌ Student not found in eligible-students collection:', studentId);
+      return {
+        valid: false,
+        error: 'Student not found in eligible list'
+      };
+    }
+
+    const eligibleData = eligibleDoc.data();
+    // console.log('✅ Eligible student found:', {
+    //   studentId,
+    //   eligibleFaculty: eligibleData.faculty,
+    //   eligibleSubject: eligibleData.subject,
+    //   eligibleName: eligibleData.name
+    // });
+    
+    // Get faculty alias for the selected faculty
+    let selectedFacultyAlias = selectedFacultyName;
+    if (facultyData && typeof facultyData === 'object') {
+      const facultyObj = Object.values(facultyData).find(f => f && f.name === selectedFacultyName);
+      if (facultyObj && facultyObj.alias) {
+        selectedFacultyAlias = facultyObj.alias;
+      }
+    }
+
+    // console.log('📝 Form submission data:', {
+    //   selectedFacultyName,
+    //   selectedFacultyAlias,
+    //   selectedDepartment
+    // });
+
+    // Check if faculty matches (compare aliases/short forms)
+    const eligibleFaculty = eligibleData.faculty ? eligibleData.faculty.trim().toLowerCase() : '';
+    const selectedFaculty = selectedFacultyAlias ? selectedFacultyAlias.trim().toLowerCase() : '';
+    
+    // console.log('🔍 Faculty comparison:', {
+    //   database: `"${eligibleFaculty}"`,
+    //   form: `"${selectedFaculty}"`,
+    //   match: eligibleFaculty === selectedFaculty
+    // });
+    
+    if (eligibleFaculty !== selectedFaculty) {
+      // console.log('❌ Faculty mismatch detected');
+      return {
+        valid: false,
+        error: 'Faculty information does not match our records'
+      };
+    }
+
+    // Check if department/subject matches (normalize & vs "and")
+    const eligibleSubject = normalizeDepartmentName(eligibleData.subject);
+    const selectedDept = normalizeDepartmentName(selectedDepartment);
+    
+    // console.log('🔍 Department/Subject comparison (normalized):', {
+    //   database: `"${eligibleSubject}"`,
+    //   form: `"${selectedDept}"`,
+    //   match: eligibleSubject === selectedDept
+    // });
+    
+    if (eligibleSubject !== selectedDept) {
+      // console.log('❌ Department/Subject mismatch detected');
+      return {
+        valid: false,
+        error: 'Department information does not match our records'
+      };
+    }
+
+    // console.log('✅ All validations passed - eligible student info matches form data');
+    return {
+      valid: true,
+      error: null
+    };
+  } catch (error) {
+    // console.error('❌ Error validating eligible student info:', error);
+    throw error;
+  }
+};
+
+/**
+ * Check if student already submitted for a SPECIFIC faculty/department
+ * OPTIMIZED: Only 1 database read for the specific path instead of checking all combinations
+ * @param {string} studentId - The student ID to check
+ * @param {string} facultyAlias - The faculty alias (e.g., 'engineering', 'science')
+ * @param {string} department - The department name
+ * @returns {Promise<boolean>} - True if submission exists, false otherwise
+ */
+export const checkDuplicateSubmissionOptimized = async (studentId, facultyAlias, department) => {
+  try {
+    const docPath = `student-information-form/form-values/${facultyAlias}/${department}/submissions/${studentId}`;
+    const docRef = doc(db, docPath);
+    const docSnapshot = await getDoc(docRef);
+    return docSnapshot.exists();
+  } catch (error) {
+    console.error('Error checking duplicate submission:', error);
+    throw error;
+  }
+};
+
+/**
  * Check if a student ID already has a submission
  * Iterates through all faculties and departments to check if a document exists with the given studentId
  * @param {string} studentId - The student ID to check
  * @returns {Promise<boolean>} - True if submission exists, false otherwise
+ * @deprecated This function makes many reads. Use checkDuplicateSubmissionOptimized() instead
  */
 export const checkDuplicateSubmission = async (studentId) => {
   try {
