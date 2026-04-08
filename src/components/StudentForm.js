@@ -22,7 +22,7 @@ import {
   checkStudentIdInCSV
 } from '../utils/validation';
 import { 
-  checkDuplicateSubmission,
+  // checkDuplicateSubmission,
   checkEligibleStudent,
   validateEligibleStudentInfo,
   checkDuplicateSubmissionOptimized,
