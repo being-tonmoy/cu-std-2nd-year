@@ -246,9 +246,9 @@ const SubmissionManagement = () => {
       'Faculty of Science': 'fsc',
       'Faculty of Business Administration': 'fba',
       'Faculty of Social Sciences': 'fss',
-      'Faculty of Law': 'law',
-      'Faculty of Biological Sciences': 'fbs',
-      'Faculty of Engineering': 'fe',
+      'Faculty of Law': 'folaw',
+      'Faculty of Biological Sciences': 'fbio',
+      'Faculty of Engineering': 'fengg',
       'Faculty of Education': 'fedu',
       'Faculty of Marine Sciences and Fisheries': 'fmsf'
     };
