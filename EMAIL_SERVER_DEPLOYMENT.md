@@ -49,8 +49,8 @@ Form will automatically send emails to `http://localhost:3001/api/email/applicat
    - Connect your Git repository
    - Root Directory: `email-server`
    - Environment Variables:
-     - `EMAIL_USER` = `ict@cu.ac.bd`
-     - `EMAIL_PASSWORD` = `ucui xflj auma rlww`
+     - `EMAIL_USER` = `xxxxxxxxxx@xx.xx.xx.xx`
+     - `EMAIL_PASSWORD` = `xxxx xxxx xxxx xxxx`
    - Deploy
 
 3. **Get Vercel URL:** `https://email-server-xyz.vercel.app`
