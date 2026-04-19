@@ -272,8 +272,8 @@ No rate limiting is currently implemented. Vercel's free tier has:
 ## Environment Variables
 
 ```env
-EMAIL_USER=ict@cu.ac.bd              # Gmail address
-EMAIL_PASSWORD=ucui xflj auma rlww   # Gmail app password
+EMAIL_USER=xxxxxxxxxxx@xx.xx.xx.xx              # Gmail address
+EMAIL_PASSWORD=xxxx xxxx xxxx xxxx   # Gmail app password
 PORT=3001                            # Server port (optional)
 NODE_ENV=production                  # Environment (optional)
 ```
