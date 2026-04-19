@@ -214,8 +214,8 @@ project/
 
 ### Email Server (`.env`)
 ```env
-EMAIL_USER=ict@cu.ac.bd
-EMAIL_PASSWORD=ucui xflj auma rlww
+EMAIL_USER=xxxxxxxxx@xx.xx.xx.xx
+EMAIL_PASSWORD=xxxx xxxx xxxx xxxx
 PORT=3001  # Optional, default 3001
 ```
 
