@@ -15,6 +15,8 @@ import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import CircularProgress from '@mui/material/CircularProgress';
+import Skeleton from '@mui/material/Skeleton';
 import LogoutIcon from '@mui/icons-material/Logout';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import PeopleIcon from '@mui/icons-material/People';
@@ -36,6 +38,8 @@ const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const [submissions, setSubmissions] = useState([]);
   const [complaints, setComplaints] = useState([]);
+  const [submissionsLoading, setSubmissionsLoading] = useState(true);
+  const [complaintsLoading, setComplaintsLoading] = useState(true);
   const [facultySortConfig, setFacultySortConfig] = useState({ key: 'count', direction: 'desc' });
   const [departmentSortConfig, setDepartmentSortConfig] = useState({ key: 'count', direction: 'desc' });
 
@@ -46,6 +50,7 @@ const AdminDashboard = () => {
 
   const loadSubmissions = async () => {
     try {
+      setSubmissionsLoading(true);
       const data = await getAllSubmissions();
       setSubmissions(data);
     } catch (error) {
@@ -56,11 +61,14 @@ const AdminDashboard = () => {
         text: 'Failed to load submissions',
         confirmButtonColor: '#001f3f'
       });
+    } finally {
+      setSubmissionsLoading(false);
     }
   };
 
   const loadComplaints = async () => {
     try {
+      setComplaintsLoading(true);
       const complaintsCollection = collection(db, 'complaints');
       const snapshot = await getDocs(complaintsCollection);
       const complaintsData = snapshot.docs.map(doc => ({
@@ -70,6 +78,8 @@ const AdminDashboard = () => {
       setComplaints(complaintsData);
     } catch (error) {
       console.error('Error loading complaints:', error);
+    } finally {
+      setComplaintsLoading(false);
     }
   };
 
@@ -249,7 +259,7 @@ const AdminDashboard = () => {
                       Total Submissions
                     </Typography>
                     <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                      {stats.totalSubmissions}
+                      {submissionsLoading ? <Skeleton variant="text" width="40px" /> : stats.totalSubmissions}
                     </Typography>
                   </Box>
                   <AssignmentIcon sx={{ fontSize: 50, opacity: 0.3 }} />
@@ -267,7 +277,7 @@ const AdminDashboard = () => {
                       Faculties
                     </Typography>
                     <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                      {stats.totalFaculties}
+                      {submissionsLoading ? <Skeleton variant="text" width="40px" /> : stats.totalFaculties}
                     </Typography>
                   </Box>
                   <SchoolIcon sx={{ fontSize: 50, opacity: 0.3 }} />
@@ -285,7 +295,7 @@ const AdminDashboard = () => {
                       Departments
                     </Typography>
                     <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                      {stats.totalDepartments}
+                      {submissionsLoading ? <Skeleton variant="text" width="40px" /> : stats.totalDepartments}
                     </Typography>
                   </Box>
                   <BarChartIcon sx={{ fontSize: 50, opacity: 0.3 }} />
@@ -303,7 +313,7 @@ const AdminDashboard = () => {
                       Sessions
                     </Typography>
                     <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                      {stats.sessions.length}
+                      {submissionsLoading ? <Skeleton variant="text" width="40px" /> : stats.sessions.length}
                     </Typography>
                   </Box>
                   <PeopleIcon sx={{ fontSize: 50, opacity: 0.3 }} />
@@ -321,7 +331,7 @@ const AdminDashboard = () => {
                       Open Issues
                     </Typography>
                     <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                      {complaints.filter(c => c.status === 'open').length}
+                      {complaintsLoading ? <Skeleton variant="text" width="40px" /> : complaints.filter(c => c.status === 'open').length}
                     </Typography>
                   </Box>
                   <WarningIcon sx={{ fontSize: 50, opacity: 0.3 }} />
@@ -332,7 +342,11 @@ const AdminDashboard = () => {
         </Grid>
 
         {/* Submissions by Faculty - Chart and Table */}
-        {Object.keys(submissionsByFaculty).length > 0 && (
+        {submissionsLoading ? (
+          <Paper sx={{ p: 3, mb: 4, borderRadius: '12px', minHeight: '500px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <CircularProgress />
+          </Paper>
+        ) : Object.keys(submissionsByFaculty).length > 0 ? (
           <Paper sx={{ p: 3, mb: 4, borderRadius: '12px' }}>
             <Typography variant="h6" sx={{ color: '#001f3f', fontWeight: 'bold', mb: 3 }}>
               Submissions by Faculty
@@ -445,10 +459,14 @@ const AdminDashboard = () => {
               </TableContainer>
             </Box>
           </Paper>
-        )}
+        ) : null}
 
         {/* Submissions by Department - Chart and Table */}
-        {Object.keys(submissionsByDepartment).length > 0 && (
+        {submissionsLoading ? (
+          <Paper sx={{ p: 3, mb: 4, borderRadius: '12px', minHeight: '500px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <CircularProgress />
+          </Paper>
+        ) : Object.keys(submissionsByDepartment).length > 0 ? (
           <Paper sx={{ p: 3, mb: 4, borderRadius: '12px' }}>
             <Typography variant="h6" sx={{ color: '#001f3f', fontWeight: 'bold', mb: 3 }}>
               Submissions by Department
@@ -587,10 +605,14 @@ const AdminDashboard = () => {
               </TableContainer>
             </Box>
           </Paper>
-        )}
+        ) : null}
 
         {/* Submissions Timeline - Line Graph */}
-        {sortedDates.length > 0 && (
+        {submissionsLoading ? (
+          <Paper sx={{ p: 3, mb: 4, borderRadius: '12px', minHeight: '500px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <CircularProgress />
+          </Paper>
+        ) : sortedDates.length > 0 ? (
           <Paper sx={{ p: 3, mb: 4, borderRadius: '12px' }}>
             <Typography variant="h6" sx={{ color: '#001f3f', fontWeight: 'bold', mb: 3 }}>
               Submissions by Date
@@ -738,7 +760,7 @@ const AdminDashboard = () => {
               </Grid>
             </Box>
           </Paper>
-        )}
+        ) : null}
 
       </Container>
     </>
