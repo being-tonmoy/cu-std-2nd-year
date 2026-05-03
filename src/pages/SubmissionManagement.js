@@ -39,7 +39,6 @@ import BlockIcon from '@mui/icons-material/Block';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Swal from 'sweetalert2';
 import { 
-  getAllSubmissions, 
   deleteStudentSubmission,
   updateSubmission,
   getFacultyData,
@@ -90,6 +89,7 @@ const SubmissionManagement = () => {
     } else if (filterArchived === 'all' && !loadedData.all) {
       loadAllSubmissionsData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterArchived, loadedData]);
 
   // Update submissions display when filter or loaded data changes
