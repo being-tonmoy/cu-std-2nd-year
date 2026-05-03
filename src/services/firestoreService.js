@@ -669,6 +669,50 @@ export const getAllSubmissions = async () => {
 };
 
 /**
+ * Optimized: Get submissions by archive status to reduce Firebase queries
+ * @param {string} status - 'active' (default), 'archived', or 'all'
+ * @returns {Promise<array>} - Submissions filtered by status
+ */
+export const getSubmissionsByStatus = async (status = 'active') => {
+  try {
+    const submissions = [];
+    const q = query(collectionGroup(db, 'submissions'));
+    const querySnapshot = await getDocs(q);
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      const isArchived = data.isArchived || false;
+      
+      // Filter based on status
+      if (status === 'active' && !isArchived) {
+        submissions.push({
+          id: doc.id,
+          ...data
+        });
+      } else if (status === 'archived' && isArchived) {
+        submissions.push({
+          id: doc.id,
+          ...data
+        });
+      } else if (status === 'all') {
+        submissions.push({
+          id: doc.id,
+          ...data
+        });
+      }
+    });
+
+    // Sort by createdAt descending
+    submissions.sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
+
+    return submissions;
+  } catch (error) {
+    console.error('Error getting submissions by status:', error);
+    throw error;
+  }
+};
+
+/**
  * Delete a student submission
  */
 export const deleteStudentSubmission = async (studentId, faculty, department) => {

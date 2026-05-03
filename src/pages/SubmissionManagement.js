@@ -42,7 +42,8 @@ import {
   getAllSubmissions, 
   deleteStudentSubmission,
   updateSubmission,
-  getFacultyData
+  getFacultyData,
+  getSubmissionsByStatus
 } from '../services/firestoreService';
 
 const SubmissionManagement = () => {
@@ -51,6 +52,7 @@ const SubmissionManagement = () => {
   const [filteredSubmissions, setFilteredSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState('');
   const [order, setOrder] = useState('desc');
   const [orderBy, setOrderBy] = useState('createdAt');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -62,20 +64,49 @@ const SubmissionManagement = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [selectedRows, setSelectedRows] = useState(new Set());
-  const [filterArchived, setFilterArchived] = useState('');
+  const [filterArchived, setFilterArchived] = useState('active');
   const [filterDegreeLevel, setFilterDegreeLevel] = useState('');
+  // Track which data sets have been loaded to avoid redundant Firebase queries
+  const [loadedData, setLoadedData] = useState({
+    active: false,
+    archived: false,
+    all: false
+  });
+  // Store active and archived data separately for faster filtering
+  const [activeSubmissions, setActiveSubmissions] = useState([]);
+  const [archivedSubmissions, setArchivedSubmissions] = useState([]);
 
   useEffect(() => {
-    loadSubmissions();
+    loadInitialSubmissions(); // Only load active submissions on initial mount
     loadFacultyData();
   }, []);
+
+  // Handle filter changes and load data as needed
+  useEffect(() => {
+    if (filterArchived === 'active' && !loadedData.active) {
+      loadActiveSubmissions();
+    } else if (filterArchived === 'archived' && !loadedData.archived) {
+      loadArchivedSubmissions();
+    } else if (filterArchived === 'all' && !loadedData.all) {
+      loadAllSubmissionsData();
+    }
+  }, [filterArchived, loadedData]);
+
+  // Update submissions display when filter or loaded data changes
+  useEffect(() => {
+    if (filterArchived === 'active' && loadedData.active) {
+      setSubmissions(activeSubmissions);
+    } else if (filterArchived === 'archived' && loadedData.archived) {
+      setSubmissions(archivedSubmissions);
+    }
+  }, [filterArchived, loadedData.active, loadedData.archived, activeSubmissions, archivedSubmissions]);
 
   useEffect(() => {
     let filtered = [...submissions];
 
     // Apply search filter across all fields
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (appliedSearchQuery) {
+      const query = appliedSearchQuery.toLowerCase();
       filtered = filtered.filter(sub => {
         const searchString = JSON.stringify(sub).toLowerCase();
         return searchString.includes(query);
@@ -90,12 +121,6 @@ const SubmissionManagement = () => {
     // Apply department filter
     if (filterDepartment) {
       filtered = filtered.filter(sub => sub.department === filterDepartment);
-    }
-
-    // Apply archived filter
-    if (filterArchived !== '') {
-      const isArchived = filterArchived === 'archived';
-      filtered = filtered.filter(sub => (sub.isArchived || false) === isArchived);
     }
 
     // Apply degree level filter
@@ -118,7 +143,31 @@ const SubmissionManagement = () => {
     });
 
     setFilteredSubmissions(filtered);
-  }, [submissions, searchQuery, order, orderBy, filterFaculty, filterDepartment, filterArchived, filterDegreeLevel]);
+  }, [submissions, appliedSearchQuery, order, orderBy, filterFaculty, filterDepartment, filterDegreeLevel]);
+
+  // Helper function to reload data based on current filter
+  const reloadCurrentFilter = async () => {
+    if (filterArchived === 'active') {
+      await loadActiveSubmissions();
+    } else if (filterArchived === 'archived') {
+      await loadArchivedSubmissions();
+    } else {
+      await loadAllSubmissionsData();
+    }
+  };
+
+  // Apply search filter when user clicks button or presses Enter
+  const handleApplyFilter = () => {
+    setAppliedSearchQuery(searchQuery);
+    setPage(0); // Reset to first page when applying new filter
+  };
+
+  // Handle Enter key in search input
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleApplyFilter();
+    }
+  };
 
   const loadFacultyData = async () => {
     try {
@@ -131,17 +180,96 @@ const SubmissionManagement = () => {
     }
   };
 
-  const loadSubmissions = async () => {
+  // Load only active submissions on initial page load
+  const loadInitialSubmissions = async () => {
     try {
       setLoading(true);
-      const data = await getAllSubmissions();
+      const data = await getSubmissionsByStatus('active');
+      setActiveSubmissions(data || []);
       setSubmissions(data || []);
+      setLoadedData(prev => ({ ...prev, active: true }));
     } catch (error) {
-      console.error('Error loading submissions:', error);
+      console.error('Error loading active submissions:', error);
       Swal.fire({
         icon: 'error',
         title: 'Error',
         text: 'Failed to load submissions',
+        confirmButtonColor: '#001f3f'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load only active submissions when filter is set to 'active'
+  const loadActiveSubmissions = async () => {
+    try {
+      setLoading(true);
+      if (!loadedData.active) {
+        const data = await getSubmissionsByStatus('active');
+        setActiveSubmissions(data || []);
+        setSubmissions(data || []);
+        setLoadedData(prev => ({ ...prev, active: true }));
+      } else {
+        setSubmissions(activeSubmissions);
+      }
+    } catch (error) {
+      console.error('Error loading active submissions:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to load submissions',
+        confirmButtonColor: '#001f3f'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load archived submissions when user selects archived filter
+  const loadArchivedSubmissions = async () => {
+    try {
+      setLoading(true);
+      if (!loadedData.archived) {
+        const data = await getSubmissionsByStatus('archived');
+        setArchivedSubmissions(data || []);
+        setSubmissions(data || []);
+        setLoadedData(prev => ({ ...prev, archived: true }));
+      } else {
+        setSubmissions(archivedSubmissions);
+      }
+    } catch (error) {
+      console.error('Error loading archived submissions:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to load archived submissions',
+        confirmButtonColor: '#001f3f'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load all submissions when user selects 'all'
+  const loadAllSubmissionsData = async () => {
+    try {
+      setLoading(true);
+      if (!loadedData.all) {
+        const data = await getSubmissionsByStatus('all');
+        setSubmissions(data || []);
+        setLoadedData(prev => ({ ...prev, all: true }));
+      } else {
+        // If already loaded, combine both datasets
+        const combined = [...activeSubmissions, ...archivedSubmissions];
+        setSubmissions(combined.length > 0 ? combined : submissions);
+      }
+    } catch (error) {
+      console.error('Error loading all submissions:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to load all submissions',
         confirmButtonColor: '#001f3f'
       });
     } finally {
@@ -188,7 +316,7 @@ const SubmissionManagement = () => {
         confirmButtonColor: '#001f3f'
       });
       setEditDialogOpen(false);
-      await loadSubmissions();
+      await reloadCurrentFilter();
     } catch (error) {
       console.error('Error updating submission:', error);
       Swal.fire({
@@ -224,7 +352,7 @@ const SubmissionManagement = () => {
           timer: 2000,
           confirmButtonColor: '#001f3f'
         });
-        await loadSubmissions();
+        await reloadCurrentFilter();
       } catch (error) {
         console.error('Error deleting submission:', error);
         Swal.fire({
@@ -398,7 +526,7 @@ const SubmissionManagement = () => {
           timer: 2000,
           confirmButtonColor: '#001f3f'
         });
-        await loadSubmissions();
+        await reloadCurrentFilter();
       } catch (error) {
         console.error('Error deleting submissions:', error);
         Swal.fire({
@@ -456,7 +584,7 @@ const SubmissionManagement = () => {
           timer: 2000,
           confirmButtonColor: '#001f3f'
         });
-        await loadSubmissions();
+        await reloadCurrentFilter();
       } catch (error) {
         console.error('Error updating submissions:', error);
         Swal.fire({
@@ -499,7 +627,7 @@ const SubmissionManagement = () => {
           timer: 2000,
           confirmButtonColor: '#001f3f'
         });
-        await loadSubmissions();
+        await reloadCurrentFilter();
       } catch (error) {
         console.error('Error updating submission:', error);
         Swal.fire({
@@ -624,20 +752,36 @@ const SubmissionManagement = () => {
         {/* Filters */}
         <Paper sx={{ p: 3, mb: 3 }}>
           <Grid container spacing={2} alignItems="flex-start">
-            <Grid item xs={12} sm={12} md={3}>
+            <Grid item xs={12} sm={9} md={3}>
               <TextField
                 fullWidth
                 size="small"
                 placeholder="Search all fields..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
                 helperText="Searches: Name, Email, Faculty, Department, Session, ID"
                 InputProps={{
                   startAdornment: <SearchIcon sx={{ mr: 1, color: '#999' }} />
                 }}
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={3} md={1}>
+              <Button
+                fullWidth
+                variant="contained"
+                size="small"
+                onClick={handleApplyFilter}
+                sx={{
+                  backgroundColor: '#001f3f',
+                  height: '40px',
+                  fontWeight: 'bold'
+                }}
+              >
+                Filter
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
               <FormControl fullWidth size="small">
                 <InputLabel id="faculty-select-label">Faculty</InputLabel>
                 <Select
@@ -666,7 +810,7 @@ const SubmissionManagement = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={6} md={2}>
               <FormControl fullWidth size="small">
                 <InputLabel id="department-select-label">Department</InputLabel>
                 <Select
@@ -721,7 +865,7 @@ const SubmissionManagement = () => {
                     }
                   }}
                 >
-                  <MenuItem value="">All Status</MenuItem>
+                  <MenuItem value="all">All Status</MenuItem>
                   <MenuItem value="active">Active</MenuItem>
                   <MenuItem value="archived">Archived</MenuItem>
                 </Select>
