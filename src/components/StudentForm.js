@@ -318,14 +318,14 @@ const StudentForm = () => {
                 <p style="text-align: left; margin-top: 15px;">Please contact the ICT Cell, CU:</p>
                 </br>
                 <p style="text-align: left;">
-                  <strong>Email:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
+                  <strong>Email:</strong> <a href="mailto:support.ict@cu.ac.bd">support.ict@cu.ac.bd</a><br/>
                   <strong>Visit:</strong> ICT Cell, IT Bhaban, University of Chittagong, Chittagong
                 </p>`
             : `<p style="text-align: left;">আপনার শিক্ষার্থী আইডি <strong>${formData.studentId}</strong> এই প্রোগ্রামের যোগ্য তালিকায় নেই।</p>
                 <p style="text-align: left; margin-top: 15px;">দয়া করে আই সি টি সেল, চট্টগ্রাম বিশ্ববিদ্যালয়-এ যোগাযোগ করুন:</p>
                 </br>
                 <p style="text-align: left;">
-                  <strong>ইমেইল:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
+                  <strong>ইমেইল:</strong> <a href="mailto:support.ict@cu.ac.bd">support.ict@cu.ac.bd</a><br/>
                   <strong>ভিজিট করুন:</strong> আই সি টি সেল, আই টি ভবন, চট্টগ্রাম বিশ্ববিদ্যালয়, চট্টগ্রাম
                 </p>`,
           confirmButtonColor: '#001f3f',
@@ -374,14 +374,14 @@ const StudentForm = () => {
                 <p style="text-align: left; margin-top: 15px;">Please ensure you have selected the correct faculty and department, and try again. If the problem persists, please contact the ICT Cell, CU:</p>
                 </br>
                 <p style="text-align: left;">
-                  <strong>Email:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
+                  <strong>Email:</strong> <a href="mailto:support.ict@cu.ac.bd">support.ict@cu.ac.bd</a><br/>
                   <strong>Visit:</strong> ICT Cell, IT Bhaban, University of Chittagong, Chittagong
                 </p>`
             : `<p style="text-align: left;">আপনার নির্বাচিত ফ্যাকাল্টি এবং বিভাগ আমাদের সিস্টেমের তথ্যের সাথে মেলে না।</p>
                 <p style="text-align: left; margin-top: 15px;">দয়া করে নিশ্চিত করুন যে আপনি সঠিক ফ্যাকাল্টি এবং বিভাগ নির্বাচন করেছেন এবং আবার চেষ্টা করুন। সমস্যা বজায় থাকলে, দয়া করে আই সি টি সেল, চট্টগ্রাম বিশ্ববিদ্যালয়-এ যোগাযোগ করুন:</p>
                 </br>
                 <p style="text-align: left;">
-                  <strong>ইমেইল:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
+                  <strong>ইমেইল:</strong> <a href="mailto:support.ict@cu.ac.bd">support.ict@cu.ac.bd</a><br/>
                   <strong>ভিজিট করুন:</strong> আই সি টি সেল, আী টি ভবন, চট্টগ্রাম বিশ্ববিদ্যালয়, চট্টগ্রাম
                 </p>`,
           confirmButtonColor: '#001f3f',
@@ -430,14 +430,14 @@ const StudentForm = () => {
                 <p style="text-align: left; margin-top: 15px;">If you have mistakenly submitted or need to update your information, please contact the ICT Cell, CU:</p>
                 </br>
                 <p style="text-align: left;">
-                  <strong>Email:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
+                  <strong>Email:</strong> <a href="mailto:support.ict@cu.ac.bd">support.ict@cu.ac.bd</a><br/>
                   <strong>Visit:</strong> ICT Cell, IT Bhaban, University of Chittagong, Chittagong
                 </p>`
             : `<p style="text-align: left;">শিক্ষার্থী আইডি <strong>${formData.studentId}</strong> এর জন্য আমাদের সিস্টেমে ইতিমধ্যে একটি আবেদন রয়েছে।</p>
                 <p style="text-align: left; margin-top: 15px;">যদি আপনি ভুলবশত জমা দিয়ে থাকেন বা আপনার তথ্য আপডেট করতে চান, তবে আই সি টি সেল, চট্টগ্রাম বিশ্ববিদ্যালয়-এ যোগাযোগ করুন:</p>
                 </br>
                 <p style="text-align: left;">
-                  <strong>ইমেইল:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a><br/>
+                  <strong>ইমেইল:</strong> <a href="mailto:support.ict@cu.ac.bd">support.ict@cu.ac.bd</a><br/>
                   <strong>ভিজিট করুন:</strong> আই সি টি সেল, আই টি ভবন, চট্টগ্রাম বিশ্ববিদ্যালয়, চট্টগ্রাম
                 </p>`,
           confirmButtonColor: '#001f3f',
@@ -474,14 +474,14 @@ const StudentForm = () => {
                   </br>
                   <p style="text-align: left;">
                     <strong>Address:</strong> ICT Cell, IT Bhaban, University of Chittagong, Chittagong<br/>
-                    <strong>Email:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a>
+                    <strong>Email:</strong> <a href="mailto:support.ict@cu.ac.bd">support.ict@cu.ac.bd</a>
                   </p>`
               : `<p style="text-align: left;">শিক্ষার্থী আইডি <strong>${formData.studentId}</strong> ডাটাবেসে পাওয়া যায়নি।</p>
                   <p style="text-align: left; margin-top: 15px;">যদি আপনি নিশ্চিত থাকেন যে আপনি সঠিক আইডি প্রবেশ করেছেন, তবে দয়া করে আই সি টি সেল, চট্টগ্রাম বিশ্ববিদ্যালয়-এ যোগাযোগ করুন:</p>
                   </br>
                   <p style="text-align: left;">
                     <strong>Address:</strong> আইসিটি সেল, আইটি ভবন, চট্টগ্রাম বিশ্ববিদ্যালয়, চট্টগ্রাম<br/>
-                    <strong>ইমেইল:</strong> <a href="mailto:tonmoy.ict@cu.ac.bd">tonmoy.ict@cu.ac.bd</a>
+                    <strong>ইমেইল:</strong> <a href="mailto:support.ict@cu.ac.bd">support.ict@cu.ac.bd</a>
                   </p>`,
             confirmButtonColor: '#001f3f',
             allowOutsideClick: false
@@ -748,7 +748,7 @@ const StudentForm = () => {
                 }
                 <Typography
                   component="a"
-                  href="mailto:tonmoy.ict@cu.ac.bd"
+                  href="mailto:support.ict@cu.ac.bd"
                   sx={{
                     color: '#001f3f',
                     fontWeight: 'bold',
@@ -759,7 +759,7 @@ const StudentForm = () => {
                     }
                   }}
                 >
-                  tonmoy.ict@cu.ac.bd
+                  support.ict@cu.ac.bd
                 </Typography>
               </Typography>
             </Box>
