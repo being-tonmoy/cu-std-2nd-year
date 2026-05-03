@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
@@ -9,6 +9,10 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -43,7 +47,8 @@ import {
   updateStudentData,
   deleteStudentData,
   importStudentsFromCSVBatched,
-  getAllSubmissions
+  getAllSubmissions,
+  getFacultyData
 } from '../services/firestoreService';
 
 const StudentDataManager = () => {
@@ -59,6 +64,8 @@ const StudentDataManager = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
+  const [facultyData, setFacultyData] = useState(null);
+  const [departments, setDepartments] = useState([]);
   const [formData, setFormData] = useState({
     student_id: '',
     name: '',
@@ -66,10 +73,40 @@ const StudentDataManager = () => {
     faculty: ''
   });
 
-  // Load submissions on mount only
+  // Load submissions and faculty data on mount
   useEffect(() => {
     loadSubmissions();
+    loadFacultyData();
   }, []);
+
+  const loadFacultyData = async () => {
+    try {
+      const data = await getFacultyData();
+      if (data) {
+        setFacultyData(data);
+      }
+    } catch (error) {
+      console.error('Error loading faculty data:', error);
+    }
+  };
+
+  // Update departments when faculty changes
+  useEffect(() => {
+    if (formData.faculty && facultyData) {
+      const selectedFacultyObj = Object.values(facultyData).find(
+        f => f && f.name === formData.faculty
+      );
+      if (selectedFacultyObj && selectedFacultyObj.departments) {
+        setDepartments(selectedFacultyObj.departments);
+      } else {
+        setDepartments([]);
+      }
+      // Clear department when faculty changes
+      setFormData(prev => ({ ...prev, subject: '' }));
+    } else {
+      setDepartments([]);
+    }
+  }, [formData.faculty, facultyData]);
 
   const loadSubmissions = async () => {
     try {
@@ -171,6 +208,7 @@ const StudentDataManager = () => {
         subject: '',
         faculty: ''
       });
+      setDepartments([]);
     }
     setOpenDialog(true);
   };
@@ -186,6 +224,24 @@ const StudentDataManager = () => {
         icon: 'warning',
         title: 'Validation Error',
         text: 'Student ID is required'
+      });
+      return;
+    }
+
+    if (!formData.faculty) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Faculty is required'
+      });
+      return;
+    }
+
+    if (!formData.subject) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Department is required'
       });
       return;
     }
@@ -382,6 +438,24 @@ const StudentDataManager = () => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
+
+  // Memoize faculty list
+  const facultyList = useMemo(() => {
+    if (facultyData && typeof facultyData === 'object') {
+      return Object.values(facultyData)
+        .filter(f => f && f.name)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return [];
+  }, [facultyData]);
+
+  // Memoize sorted departments
+  const sortedDepartments = useMemo(() => {
+    if (departments && Array.isArray(departments)) {
+      return [...departments].sort((a, b) => a.localeCompare(b));
+    }
+    return [];
+  }, [departments]);
 
   const sortedStudents = getSortedStudents();
   const paginatedStudents = sortedStudents.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
@@ -722,22 +796,47 @@ const StudentDataManager = () => {
             margin="normal"
             placeholder="Full Name"
           />
-          <TextField
-            fullWidth
-            label="Subject"
-            value={formData.subject}
-            onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-            margin="normal"
-            placeholder="e.g., Accounting"
-          />
-          <TextField
-            fullWidth
-            label="Faculty"
-            value={formData.faculty}
-            onChange={(e) => setFormData({ ...formData, faculty: e.target.value })}
-            margin="normal"
-            placeholder="e.g., fba (Faculty alias)"
-          />
+          <FormControl fullWidth margin="normal" required>
+            <InputLabel>Faculty</InputLabel>
+            <Select
+              label="Faculty"
+              value={formData.faculty}
+              onChange={(e) => setFormData({ ...formData, faculty: e.target.value })}
+            >
+              {facultyList.length > 0 ? (
+                facultyList.map(faculty => (
+                  <MenuItem key={faculty.alias} value={faculty.name}>
+                    {faculty.name}
+                  </MenuItem>
+                ))
+              ) : (
+                <MenuItem value="" disabled>No faculties available</MenuItem>
+              )}
+            </Select>
+          </FormControl>
+          <FormControl 
+            fullWidth 
+            margin="normal" 
+            required
+            disabled={!formData.faculty}
+          >
+            <InputLabel>Department</InputLabel>
+            <Select
+              label="Department"
+              value={formData.subject}
+              onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+            >
+              {sortedDepartments.length > 0 ? (
+                sortedDepartments.map(dept => (
+                  <MenuItem key={dept} value={dept}>{dept}</MenuItem>
+                ))
+              ) : (
+                <MenuItem value="" disabled>
+                  {formData.faculty ? 'No departments available' : 'Please select a faculty first'}
+                </MenuItem>
+              )}
+            </Select>
+          </FormControl>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={handleCloseDialog}>Cancel</Button>
