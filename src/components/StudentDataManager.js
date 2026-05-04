@@ -199,7 +199,18 @@ const StudentDataManager = () => {
   const handleOpenDialog = (student = null) => {
     if (student) {
       setEditingStudent(student);
-      setFormData(student);
+      // Convert faculty alias back to full name for display
+      let facultyName = student.faculty;
+      if (facultyData && typeof facultyData === 'object' && student.faculty) {
+        const facultyObj = facultyData[student.faculty];
+        if (facultyObj && facultyObj.name) {
+          facultyName = facultyObj.name;
+        }
+      }
+      setFormData({
+        ...student,
+        faculty: facultyName
+      });
     } else {
       setEditingStudent(null);
       setFormData({
@@ -247,12 +258,26 @@ const StudentDataManager = () => {
     }
 
     try {
+      // Get faculty alias from the selected faculty name
+      let facultyAlias = formData.faculty;
+      if (facultyData && typeof facultyData === 'object') {
+        const facultyObj = Object.values(facultyData).find(f => f && f.name === formData.faculty);
+        if (facultyObj && facultyObj.alias) {
+          facultyAlias = facultyObj.alias;
+        }
+      }
+
+      const dataToSave = {
+        ...formData,
+        faculty: facultyAlias  // Save the alias instead of full name
+      };
+
       if (editingStudent) {
         // Update existing student
         await updateStudentData(editingStudent.id || editingStudent.student_id, {
           name: formData.name,
           subject: formData.subject,
-          faculty: formData.faculty
+          faculty: facultyAlias
         });
         Swal.fire({
           icon: 'success',
@@ -263,7 +288,7 @@ const StudentDataManager = () => {
         });
       } else {
         // Add new student
-        await addStudentData(formData);
+        await addStudentData(dataToSave);
         Swal.fire({
           icon: 'success',
           title: 'Success',

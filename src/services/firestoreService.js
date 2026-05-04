@@ -1194,18 +1194,24 @@ export const importStudentsFromCSVBatched = async (csvData, onProgress = null) =
 
       for (const studentData of batch) {
         try {
-          const { student_id, name, subject, faculty } = studentData;
+          let { student_id, name, subject, faculty } = studentData;
           
           if (!student_id) {
             throw new Error('student_id is required');
           }
 
+          // Normalize field values (trim whitespace)
+          student_id = student_id.trim();
+          name = (name || '').trim();
+          subject = (subject || '').trim();
+          faculty = (faculty || '').trim();
+
           const docRef = doc(studentsRef, student_id);
           const dataToSave = {
             student_id,
-            name: name || '',
-            subject: subject || '',
-            faculty: faculty || '',
+            name,
+            subject,
+            faculty,
             addedAt: Timestamp.now(),
             updatedAt: Timestamp.now()
           };
