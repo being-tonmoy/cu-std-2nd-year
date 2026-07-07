@@ -383,12 +383,33 @@ const StudentDataManager = () => {
         const result = await Swal.fire({
           icon: 'info',
           title: 'Import Confirmation',
-          html: `<p>Found <strong>${csvStudents.length}</strong> students to import.</p>
-                 <p><strong>Note:</strong> Only new students (not already in the system) will be uploaded.</p>
-                 <p>Import will process in batches of 500 to avoid network issues.</p>
-                 <p style="color: #ff6b6b; margin-top: 15px;">
-                   <strong>Continue?</strong>
-                 </p>`,
+          html: `
+            <p>Found <strong>${csvStudents.length}</strong> students to import.</p>
+            <p><strong>Required CSV format:</strong></p>
+            <div style="overflow-x: auto; margin: 12px 0; border: 1px solid #e0e0e0; border-radius: 8px;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                <thead>
+                  <tr style="background: #001f3f; color: white;">
+                    <th style="padding: 8px; text-align: left;">student_id</th>
+                    <th style="padding: 8px; text-align: left;">name</th>
+                    <th style="padding: 8px; text-align: left;">subject</th>
+                    <th style="padding: 8px; text-align: left;">faculty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="background: #fafafa;">
+                    <td style="padding: 8px; border-top: 1px solid #e0e0e0;">2503011121</td>
+                    <td style="padding: 8px; border-top: 1px solid #e0e0e0;">John Doe</td>
+                    <td style="padding: 8px; border-top: 1px solid #e0e0e0;">Computer Science</td>
+                    <td style="padding: 8px; border-top: 1px solid #e0e0e0;">Engineering</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p><strong>Note:</strong> Only new students (not already in the system) will be uploaded.</p>
+            <p>Import will process in batches of 500 to avoid network issues.</p>
+            <p style="color: #ff6b6b; margin-top: 15px;"><strong>Continue?</strong></p>
+          `,
           showCancelButton: true,
           confirmButtonText: 'Yes, import',
           cancelButtonText: 'Cancel',
