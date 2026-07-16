@@ -14,6 +14,8 @@ Faculty of Arts and Humanities (fah):
     Sanskrit
     Music
     Bangladesh Studies
+    Language and Linguistics
+    Fine Arts
 
 
 Faculty of Science (fsc):
@@ -24,6 +26,8 @@ Faculty of Science (fsc):
     Applied Chemistry and Chemical Engineering
     Forestry and Environmental Sciences
     JNIRCMPS
+    Forestry
+    Environmental Sciences
 
 Faculty of Business Administration (fba):
     Accounting
@@ -71,8 +75,10 @@ Faculty of Engineering (fengg):
 Faculty of Education (fedu):
     Physical Education & Sports Science
     Institute of Education and Research
+    Education
 
 Faculty of Marine Sciences and Fisheries (fmsf):
     Institute of Marine Sciences
     Oceanography
     Fisheries
+    Marine Science
