@@ -47,14 +47,14 @@ import {
   updateStudentData,
   deleteStudentData,
   importStudentsFromCSVBatched,
-  getAllSubmissions,
+  getSubmissionsByStudentIds,
   getFacultyData
 } from '../services/firestoreService';
 
 const StudentDataManager = () => {
   const navigate = useNavigate();
   const [students, setStudents] = useState([]);
-  const [submissions, setSubmissions] = useState([]);
+  const [submissionLookup, setSubmissionLookup] = useState({});
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
@@ -73,9 +73,8 @@ const StudentDataManager = () => {
     faculty: ''
   });
 
-  // Load submissions and faculty data on mount
+  // Load faculty data on mount
   useEffect(() => {
-    loadSubmissions();
     loadFacultyData();
   }, []);
 
@@ -108,14 +107,63 @@ const StudentDataManager = () => {
     }
   }, [formData.faculty, facultyData]);
 
-  const loadSubmissions = async () => {
-    try {
-      const submissionData = await getAllSubmissions();
-      setSubmissions(submissionData || []);
-    } catch (error) {
-      console.error('Error loading submissions:', error);
-    }
-  };
+  useEffect(() => {
+    let isActive = true;
+
+    const loadVisibleSubmissions = async () => {
+      const visibleStudents = [...students]
+        .sort((a, b) => {
+          let aValue = a[orderBy];
+          let bValue = b[orderBy];
+
+          if (aValue < bValue) {
+            return order === 'asc' ? -1 : 1;
+          }
+          if (aValue > bValue) {
+            return order === 'asc' ? 1 : -1;
+          }
+          return 0;
+        })
+        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+      const visibleStudentIds = visibleStudents.map(student => student.student_id);
+
+      if (visibleStudentIds.length === 0) {
+        setSubmissionLookup({});
+        return;
+      }
+
+      try {
+        const submissionsForPage = await getSubmissionsByStudentIds(visibleStudentIds);
+
+        if (!isActive) {
+          return;
+        }
+
+        const lookup = submissionsForPage.reduce((acc, submission) => {
+          if (!acc[submission.studentId]) {
+            acc[submission.studentId] = [];
+          }
+
+          acc[submission.studentId].push(submission);
+          return acc;
+        }, {});
+
+        setSubmissionLookup(lookup);
+      } catch (error) {
+        if (isActive) {
+          console.error('Error loading submissions for visible students:', error);
+          setSubmissionLookup({});
+        }
+      }
+    };
+
+    loadVisibleSubmissions();
+
+    return () => {
+      isActive = false;
+    };
+  }, [students, order, orderBy, page, rowsPerPage]);
 
   const performSearch = useCallback(async () => {
     try {
@@ -153,9 +201,7 @@ const StudentDataManager = () => {
 
   // Check if eligible student's faculty matches any submission's department
   const getStudentVerification = (student) => {
-    const matchingSubmissions = submissions.filter(sub => 
-      sub.studentId === student.student_id
-    );
+    const matchingSubmissions = submissionLookup[student.student_id] || [];
 
     if (matchingSubmissions.length === 0) {
       return { matched: false, message: 'No submissions' };

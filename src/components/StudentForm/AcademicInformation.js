@@ -22,7 +22,7 @@ const AcademicInformation = ({
   facultyData
 }) => {
   // Session options
-  const SESSIONS = ['2025-26', '2024-25', '2023-24', '2022-23', '2021-22', '2020-21', '2019-20', '2018-19'];
+  const SESSIONS = ['2024-25', '2023-24', '2022-23', '2021-22', '2020-21', '2019-20', '2018-19'];
   
   // Safely get faculty list and sort alphabetically - memoized
   const facultyList = useMemo(() => {

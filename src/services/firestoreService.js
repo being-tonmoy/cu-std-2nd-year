@@ -6,6 +6,11 @@ import {
   query,
   where,
   getDocs,
+  limit,
+  orderBy,
+  startAt,
+  endAt,
+  increment,
   Timestamp,
   serverTimestamp,
   collectionGroup,
@@ -413,6 +418,13 @@ export const saveStudentForm = async (formData, facultyData) => {
 
     // Set the form data
     await setDoc(studentDocRef, formDataDocument);
+    await updateDashboardSummaryCounts({
+      faculty,
+      department,
+      session,
+      createdAt: formDataDocument.createdAt,
+      delta: 1
+    });
 
     return {
       success: true,
@@ -668,6 +680,148 @@ export const getAllSubmissions = async () => {
   }
 };
 
+const getDashboardSummaryRef = () => doc(db, 'student-information-form', 'dashboard-summary');
+
+const getDateKey = (timestamp) => {
+  const date = timestamp?.toDate?.();
+
+  if (!date) {
+    return 'Unknown';
+  }
+
+  return date.toISOString().slice(0, 10);
+};
+
+const buildDashboardSummary = (submissions) => {
+  const summary = {
+    totalSubmissions: submissions.length,
+    submissionsByFaculty: {},
+    submissionsByDepartment: {},
+    submissionsByDate: {},
+    sessionCounts: {}
+  };
+
+  submissions.forEach((submission) => {
+    const facultyKey = submission.faculty || 'Unknown';
+    const departmentKey = submission.department || 'Unknown';
+    const dateKey = getDateKey(submission.createdAt);
+    const sessionKey = submission.session || 'Unknown';
+
+    summary.submissionsByFaculty[facultyKey] = (summary.submissionsByFaculty[facultyKey] || 0) + 1;
+    summary.submissionsByDepartment[departmentKey] = (summary.submissionsByDepartment[departmentKey] || 0) + 1;
+    summary.submissionsByDate[dateKey] = (summary.submissionsByDate[dateKey] || 0) + 1;
+    summary.sessionCounts[sessionKey] = (summary.sessionCounts[sessionKey] || 0) + 1;
+  });
+
+  return summary;
+};
+
+const buildSummaryFieldUpdates = (summaryKey, value, delta) => {
+  if (!value || !delta) {
+    return {};
+  }
+
+  return {
+    [`${summaryKey}.${value}`]: increment(delta)
+  };
+};
+
+const updateDashboardSummaryCounts = async ({ faculty, department, session, createdAt, delta }) => {
+  try {
+    const summaryRef = getDashboardSummaryRef();
+    const dateKey = getDateKey(createdAt);
+
+    await setDoc(summaryRef, {
+      totalSubmissions: increment(delta),
+      ...buildSummaryFieldUpdates('submissionsByFaculty', faculty, delta),
+      ...buildSummaryFieldUpdates('submissionsByDepartment', department, delta),
+      ...buildSummaryFieldUpdates('submissionsByDate', dateKey, delta),
+      ...buildSummaryFieldUpdates('sessionCounts', session, delta),
+      updatedAt: Timestamp.now()
+    }, { merge: true });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating dashboard summary counts:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get the dashboard summary data used by the admin dashboard charts.
+ * Falls back to a one-time rebuild if the summary document does not exist yet.
+ */
+export const getDashboardSummary = async () => {
+  try {
+    const summaryRef = getDashboardSummaryRef();
+    const summaryDoc = await getDoc(summaryRef);
+
+    if (summaryDoc.exists()) {
+      return summaryDoc.data();
+    }
+
+    const submissions = await getAllSubmissions();
+    const summary = buildDashboardSummary(submissions);
+
+    await setDoc(summaryRef, {
+      ...summary,
+      updatedAt: Timestamp.now()
+    }, { merge: true });
+
+    return {
+      ...summary,
+      updatedAt: Timestamp.now()
+    };
+  } catch (error) {
+    console.error('Error getting dashboard summary:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get submissions for a set of student IDs using collection-group queries.
+ * This keeps verification lookups scoped to the current page instead of loading
+ * the entire submissions collection.
+ * @param {string[]} studentIds - Student IDs to look up
+ * @returns {Promise<array>} - Matching submission documents
+ */
+export const getSubmissionsByStudentIds = async (studentIds) => {
+  try {
+    const uniqueStudentIds = [...new Set((studentIds || []).filter(Boolean))];
+
+    if (uniqueStudentIds.length === 0) {
+      return [];
+    }
+
+    const chunkSize = 10;
+    const chunks = [];
+
+    for (let index = 0; index < uniqueStudentIds.length; index += chunkSize) {
+      chunks.push(uniqueStudentIds.slice(index, index + chunkSize));
+    }
+
+    const queryResults = await Promise.all(
+      chunks.map(async (chunk) => {
+        const q = query(
+          collectionGroup(db, 'submissions'),
+          where('studentId', 'in', chunk)
+        );
+        const querySnapshot = await getDocs(q);
+
+        return querySnapshot.docs.map((docSnapshot) => ({
+          id: docSnapshot.id,
+          ...docSnapshot.data()
+        }));
+      })
+    );
+
+    return queryResults.flat().sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
+  } catch (error) {
+    console.error('Error getting submissions by student ids:', error);
+    throw error;
+  }
+};
+
 /**
  * Optimized: Get submissions by archive status to reduce Firebase queries
  * @param {string} status - 'active' (default), 'archived', or 'all'
@@ -721,6 +875,19 @@ export const deleteStudentSubmission = async (studentId, faculty, department) =>
     // Use the facultyAlias which is already stored in the submission
     const submissionPath = `student-information-form/form-values/${faculty}/${department}/submissions/${studentId}`;
     const docRef = doc(db, submissionPath);
+    const existingSubmission = await getDoc(docRef);
+
+    if (existingSubmission.exists()) {
+      const existingData = existingSubmission.data();
+      await updateDashboardSummaryCounts({
+        faculty: existingData.faculty || faculty,
+        department: existingData.department || department,
+        session: existingData.session,
+        createdAt: existingData.createdAt,
+        delta: -1
+      });
+    }
+
     await deleteDoc(docRef);
 
     return {
@@ -744,11 +911,49 @@ export const updateSubmission = async (studentId, faculty, department, updateDat
   try {
     const submissionPath = `student-information-form/form-values/${faculty}/${department}/submissions/${studentId}`;
     const docRef = doc(db, submissionPath);
-    
+    const existingSubmission = await getDoc(docRef);
+    const existingData = existingSubmission.exists() ? existingSubmission.data() : null;
+
     await updateDoc(docRef, {
       ...updateData,
       updatedAt: serverTimestamp()
     });
+
+    if (existingData) {
+      const previousFaculty = existingData.faculty || faculty;
+      const previousDepartment = existingData.department || department;
+      const previousSession = existingData.session;
+      const previousCreatedAt = existingData.createdAt;
+
+      const nextFaculty = updateData.faculty ?? previousFaculty;
+      const nextDepartment = updateData.department ?? previousDepartment;
+      const nextSession = updateData.session ?? previousSession;
+      const nextCreatedAt = updateData.createdAt ?? previousCreatedAt;
+
+      const summaryChanged =
+        nextFaculty !== previousFaculty ||
+        nextDepartment !== previousDepartment ||
+        nextSession !== previousSession ||
+        getDateKey(nextCreatedAt) !== getDateKey(previousCreatedAt);
+
+      if (summaryChanged) {
+        await updateDashboardSummaryCounts({
+          faculty: previousFaculty,
+          department: previousDepartment,
+          session: previousSession,
+          createdAt: previousCreatedAt,
+          delta: -1
+        });
+
+        await updateDashboardSummaryCounts({
+          faculty: nextFaculty,
+          department: nextDepartment,
+          session: nextSession,
+          createdAt: nextCreatedAt,
+          delta: 1
+        });
+      }
+    }
 
     return {
       success: true,
@@ -995,54 +1200,55 @@ export const getAllStudents = async () => {
  */
 export const searchStudents = async (searchTerm) => {
   try {
-    if (!searchTerm || searchTerm.trim().length === 0) {
+    const normalizedTerm = searchTerm?.trim();
+
+    if (!normalizedTerm) {
       return [];
     }
 
     const studentsRef = collection(db, 'eligible-students');
-    const students = [];
+    const studentsById = new Map();
 
-    // Query by student_id (primary search - most efficient)
-    if (/^\d+$/.test(searchTerm)) {
-      const q = query(
-        studentsRef,
-        where('student_id', '>=', searchTerm),
-        where('student_id', '<', searchTerm + '\uf8ff')
-      );
-      const querySnapshot = await getDocs(q);
-      querySnapshot.forEach((doc) => {
-        students.push({
-          id: doc.id,
-          ...doc.data()
-        });
-      });
-    }
+    const addResults = async (field, term, resultLimit = 25) => {
+      const variants = [...new Set([
+        term,
+        term.toLowerCase(),
+        term.toUpperCase(),
+        term.charAt(0).toUpperCase() + term.slice(1).toLowerCase()
+      ].filter(Boolean))];
 
-    // If still empty or search term contains non-digits, fetch all and filter client-side
-    // This is acceptable since users will type a student ID or name to narrow down results
-    if (students.length === 0) {
-      const allSnapshot = await getDocs(studentsRef);
-      const searchLower = searchTerm.toLowerCase();
-      
-      allSnapshot.forEach((doc) => {
-        const student = doc.data();
-        if (
-          student.student_id.includes(searchTerm) ||
-          (student.name?.toLowerCase() || '').includes(searchLower) ||
-          (student.faculty?.toLowerCase() || '').includes(searchLower)
-        ) {
-          students.push({
-            id: doc.id,
-            ...student
+      for (const variant of variants) {
+        const q = query(
+          studentsRef,
+          orderBy(field),
+          startAt(variant),
+          endAt(`${variant}\uf8ff`),
+          limit(resultLimit)
+        );
+
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach((docSnapshot) => {
+          studentsById.set(docSnapshot.id, {
+            id: docSnapshot.id,
+            ...docSnapshot.data()
           });
+        });
+
+        if (studentsById.size >= resultLimit) {
+          break;
         }
-      });
+      }
+    };
+
+    if (/^\d+$/.test(normalizedTerm)) {
+      await addResults('student_id', normalizedTerm, 50);
+    } else {
+      await addResults('name', normalizedTerm, 25);
+      await addResults('faculty', normalizedTerm, 25);
+      await addResults('subject', normalizedTerm, 25);
     }
 
-    // Sort by student_id
-    students.sort((a, b) => a.student_id.localeCompare(b.student_id));
-    
-    return students;
+    return [...studentsById.values()].sort((a, b) => a.student_id.localeCompare(b.student_id));
   } catch (error) {
     console.error('Error searching students:', error);
     throw error;

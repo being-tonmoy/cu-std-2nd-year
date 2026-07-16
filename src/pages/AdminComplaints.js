@@ -55,29 +55,11 @@ const AdminComplaints = () => {
     try {
       const complaintsCollection = collection(db, 'complaints');
       const snapshot = await getDocs(complaintsCollection);
-      const complaintsData = await Promise.all(
-        snapshot.docs.map(async (doc) => {
-          const complaintData = {
-            id: doc.id,
-            ...doc.data()
-          };
-          
-          // Load messages for this complaint
-          try {
-            const messagesCollection = collection(doc.ref, 'messages');
-            const messagesQuery = query(messagesCollection, orderBy('timestamp', 'asc'));
-            const messagesSnapshot = await getDocs(messagesQuery);
-            complaintData.messages = messagesSnapshot.docs.map(msgDoc => ({
-              id: msgDoc.id,
-              ...msgDoc.data()
-            }));
-          } catch (error) {
-            complaintData.messages = [];
-          }
-          
-          return complaintData;
-        })
-      );
+      const complaintsData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        messages: []
+      }));
       
       setComplaints(complaintsData.sort((a, b) => {
         const dateA = a.openedAt?.toDate?.() || new Date(0);
@@ -92,6 +74,33 @@ const AdminComplaints = () => {
         text: 'Failed to load complaints',
         confirmButtonColor: '#001f3f'
       });
+    }
+  };
+
+  const loadComplaintMessages = async (complaintId) => {
+    try {
+      setLoading(true);
+      const complaintRef = doc(db, 'complaints', complaintId);
+      const messagesCollection = collection(complaintRef, 'messages');
+      const messagesQuery = query(messagesCollection, orderBy('timestamp', 'asc'));
+      const messagesSnapshot = await getDocs(messagesQuery);
+
+      const messages = messagesSnapshot.docs.map((msgDoc) => ({
+        id: msgDoc.id,
+        ...msgDoc.data()
+      }));
+
+      setComplaintMessages(messages);
+      setComplaints((currentComplaints) => currentComplaints.map((complaint) => (
+        complaint.id === complaintId
+          ? { ...complaint, messages }
+          : complaint
+      )));
+    } catch (error) {
+      console.error('Error loading complaint messages:', error);
+      setComplaintMessages([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -128,11 +137,12 @@ const AdminComplaints = () => {
     setOpenEditDialog(true);
   };
 
-  const handleReplyClick = (complaint) => {
+  const handleReplyClick = async (complaint) => {
     setSelectedComplaint(complaint);
-    setComplaintMessages(complaint.messages || []);
+    setComplaintMessages([]);
     setReplyMessage('');
     setOpenReplyDialog(true);
+    await loadComplaintMessages(complaint.id);
   };
 
   const handleStatusChange = async () => {

@@ -27,17 +27,17 @@ import Swal from 'sweetalert2';
 import { Bar, Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip as ChartTooltip, Legend, Filler } from 'chart.js';
 import { useAuth } from '../contexts/AuthContext';
-import { getAllSubmissions } from '../services/firestoreService';
+import { getDashboardSummary } from '../services/firestoreService';
 import { db } from '../utils/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getCountFromServer, query, where } from 'firebase/firestore';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, ChartTooltip, Legend, Filler);
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [submissions, setSubmissions] = useState([]);
-  const [complaints, setComplaints] = useState([]);
+  const [dashboardSummary, setDashboardSummary] = useState(null);
+  const [openComplaintsCount, setOpenComplaintsCount] = useState(0);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
   const [complaintsLoading, setComplaintsLoading] = useState(true);
   const [facultySortConfig, setFacultySortConfig] = useState({ key: 'count', direction: 'desc' });
@@ -51,14 +51,14 @@ const AdminDashboard = () => {
   const loadSubmissions = async () => {
     try {
       setSubmissionsLoading(true);
-      const data = await getAllSubmissions();
-      setSubmissions(data);
+      const summary = await getDashboardSummary();
+      setDashboardSummary(summary);
     } catch (error) {
       console.error('Error loading submissions:', error);
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'Failed to load submissions',
+        text: 'Failed to load dashboard summary',
         confirmButtonColor: '#001f3f'
       });
     } finally {
@@ -70,12 +70,9 @@ const AdminDashboard = () => {
     try {
       setComplaintsLoading(true);
       const complaintsCollection = collection(db, 'complaints');
-      const snapshot = await getDocs(complaintsCollection);
-      const complaintsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setComplaints(complaintsData);
+      const openComplaintsQuery = query(complaintsCollection, where('status', '==', 'open'));
+      const snapshot = await getCountFromServer(openComplaintsQuery);
+      setOpenComplaintsCount(snapshot.data().count || 0);
     } catch (error) {
       console.error('Error loading complaints:', error);
     } finally {
@@ -155,32 +152,25 @@ const AdminDashboard = () => {
     return sortConfig.direction === 'desc' ? ' ↓' : ' ↑';
   };
 
+  const submissionsByFaculty = dashboardSummary?.submissionsByFaculty || {};
+  const submissionsByDepartment = dashboardSummary?.submissionsByDepartment || {};
+  const submissionsByDate = dashboardSummary?.submissionsByDate || {};
+  const sessionCounts = dashboardSummary?.sessionCounts || {};
+
   const stats = {
-    totalSubmissions: submissions.length,
-    totalFaculties: [...new Set(submissions.map(s => s.faculty))].length,
-    totalDepartments: [...new Set(submissions.map(s => s.department))].length,
-    sessions: [...new Set(submissions.map(s => s.session))]
+    totalSubmissions: dashboardSummary?.totalSubmissions || 0,
+    totalFaculties: Object.entries(submissionsByFaculty).filter(([, count]) => count > 0).length,
+    totalDepartments: Object.entries(submissionsByDepartment).filter(([, count]) => count > 0).length,
+    sessions: Object.entries(sessionCounts)
+      .filter(([, count]) => count > 0)
+      .map(([session]) => session)
   };
 
-  const submissionsByFaculty = submissions.reduce((acc, s) => {
-    acc[s.faculty] = (acc[s.faculty] || 0) + 1;
-    return acc;
-  }, {});
-
-  const submissionsByDepartment = submissions.reduce((acc, s) => {
-    acc[s.department] = (acc[s.department] || 0) + 1;
-    return acc;
-  }, {});
-
-  // Calculate submissions by date
-  const submissionsByDate = submissions.reduce((acc, s) => {
-    const date = s.createdAt?.toDate?.().toLocaleDateString('en-CA') || 'Unknown';
-    acc[date] = (acc[date] || 0) + 1;
-    return acc;
-  }, {});
-
   // Sort dates and get daily submission counts
-  const sortedDates = Object.keys(submissionsByDate).sort();
+  const sortedDates = Object.entries(submissionsByDate)
+    .filter(([, count]) => count > 0)
+    .map(([date]) => date)
+    .sort();
   const dateWiseData = sortedDates.map(date => submissionsByDate[date]);
 
   return (
@@ -331,7 +321,7 @@ const AdminDashboard = () => {
                       Open Issues
                     </Typography>
                     <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                      {complaintsLoading ? <Skeleton variant="text" width="40px" /> : complaints.filter(c => c.status === 'open').length}
+                      {complaintsLoading ? <Skeleton variant="text" width="40px" /> : openComplaintsCount}
                     </Typography>
                   </Box>
                   <WarningIcon sx={{ fontSize: 50, opacity: 0.3 }} />
@@ -635,7 +625,7 @@ const AdminDashboard = () => {
                         pointBackgroundColor: '#0288d1',
                         pointBorderColor: '#001f3f',
                         pointBorderWidth: 2,
-                        pointRadius: 5,
+                        pointRadius: 3,
                         pointHoverRadius: 7,
                         borderWidth: 3,
                         segment: {
@@ -680,10 +670,12 @@ const AdminDashboard = () => {
                         },
                         ticks: {
                           font: {
-                            size: 11
+                            size: 11,
+                            weight: 'bold'
                           },
-                          maxRotation: 45,
-                          minRotation: 0
+                          minRotation: 90,
+                          maxRotation: 90,
+                          autoSkip: true, 
                         }
                       },
                       y: {
