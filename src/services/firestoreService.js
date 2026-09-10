@@ -305,8 +305,7 @@ export const validateEligibleStudentInfo = async (studentId, selectedFacultyName
  */
 export const checkDuplicateSubmissionOptimized = async (studentId, facultyAlias, department) => {
   try {
-    const docPath = `student-information-form/form-values/${facultyAlias}/${department}/submissions/${studentId}`;
-    const docRef = doc(db, docPath);
+    const docRef = doc(db, 'student-information-form', 'form-values', 'new', studentId);
     const docSnapshot = await getDoc(docRef);
     return docSnapshot.exists();
   } catch (error) {
@@ -404,17 +403,8 @@ export const saveStudentForm = async (formData, facultyData) => {
       updatedAt: Timestamp.now()
     };
 
-    // Build path: student-information-form/form-values/{facultyAlias}/{department}/{studentId}
-    const formValuesRef = doc(
-      db,
-      'student-information-form',
-      'form-values'
-    );
-
-    const facultyCollRef = collection(formValuesRef, facultyAlias);
-    const departmentDocRef = doc(facultyCollRef, department);
-    const departmentCollRef = collection(departmentDocRef, 'submissions');
-    const studentDocRef = doc(departmentCollRef, studentId);
+    // New submissions stay in one small collection until they are archived.
+    const studentDocRef = doc(db, 'student-information-form', 'form-values', 'new', studentId);
 
     // Set the form data
     await setDoc(studentDocRef, formDataDocument);
@@ -659,16 +649,7 @@ export const getSubmissionStats = async () => {
  */
 export const getAllSubmissions = async () => {
   try {
-    const submissions = [];
-    const q = query(collectionGroup(db, 'submissions'));
-    const querySnapshot = await getDocs(q);
-
-    querySnapshot.forEach((doc) => {
-      submissions.push({
-        id: doc.id,
-        ...doc.data()
-      });
-    });
+    const submissions = await getSubmissionsByStatus('all');
 
     // Sort by createdAt descending
     submissions.sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
@@ -683,13 +664,23 @@ export const getAllSubmissions = async () => {
 const getDashboardSummaryRef = () => doc(db, 'student-information-form', 'dashboard-summary');
 
 const getDateKey = (timestamp) => {
-  const date = timestamp?.toDate?.();
+  const date = timestamp?.toDate?.() || (timestamp ? new Date(timestamp) : null);
 
-  if (!date) {
+  if (!date || Number.isNaN(date.getTime())) {
     return 'Unknown';
   }
 
   return date.toISOString().slice(0, 10);
+};
+
+const getMonthKey = (timestamp) => {
+  const date = timestamp?.toDate?.() || (timestamp ? new Date(timestamp) : null);
+
+  if (!date || Number.isNaN(date.getTime())) {
+    return 'Unknown';
+  }
+
+  return date.toISOString().slice(0, 7);
 };
 
 const buildDashboardSummary = (submissions) => {
@@ -698,6 +689,7 @@ const buildDashboardSummary = (submissions) => {
     submissionsByFaculty: {},
     submissionsByDepartment: {},
     submissionsByDate: {},
+    submissionsByMonth: {},
     sessionCounts: {}
   };
 
@@ -705,11 +697,13 @@ const buildDashboardSummary = (submissions) => {
     const facultyKey = submission.faculty || 'Unknown';
     const departmentKey = submission.department || 'Unknown';
     const dateKey = getDateKey(submission.createdAt);
+    const monthKey = getMonthKey(submission.createdAt);
     const sessionKey = submission.session || 'Unknown';
 
     summary.submissionsByFaculty[facultyKey] = (summary.submissionsByFaculty[facultyKey] || 0) + 1;
     summary.submissionsByDepartment[departmentKey] = (summary.submissionsByDepartment[departmentKey] || 0) + 1;
     summary.submissionsByDate[dateKey] = (summary.submissionsByDate[dateKey] || 0) + 1;
+    summary.submissionsByMonth[monthKey] = (summary.submissionsByMonth[monthKey] || 0) + 1;
     summary.sessionCounts[sessionKey] = (summary.sessionCounts[sessionKey] || 0) + 1;
   });
 
@@ -730,12 +724,14 @@ const updateDashboardSummaryCounts = async ({ faculty, department, session, crea
   try {
     const summaryRef = getDashboardSummaryRef();
     const dateKey = getDateKey(createdAt);
+    const monthKey = getMonthKey(createdAt);
 
     await setDoc(summaryRef, {
       totalSubmissions: increment(delta),
       ...buildSummaryFieldUpdates('submissionsByFaculty', faculty, delta),
       ...buildSummaryFieldUpdates('submissionsByDepartment', department, delta),
       ...buildSummaryFieldUpdates('submissionsByDate', dateKey, delta),
+      ...buildSummaryFieldUpdates('submissionsByMonth', monthKey, delta),
       ...buildSummaryFieldUpdates('sessionCounts', session, delta),
       updatedAt: Timestamp.now()
     }, { merge: true });
@@ -778,6 +774,21 @@ export const getDashboardSummary = async () => {
   }
 };
 
+/** Rebuild all dashboard aggregates from the current submission documents. */
+export const syncDashboardSummary = async () => {
+  try {
+    const submissions = await getAllSubmissions();
+    const summary = buildDashboardSummary(submissions);
+    const updatedAt = Timestamp.now();
+
+    await setDoc(getDashboardSummaryRef(), { ...summary, updatedAt }, { merge: true });
+    return { ...summary, updatedAt };
+  } catch (error) {
+    console.error('Error syncing dashboard summary:', error);
+    throw error;
+  }
+};
+
 /**
  * Get submissions for a set of student IDs using collection-group queries.
  * This keeps verification lookups scoped to the current page instead of loading
@@ -802,13 +813,20 @@ export const getSubmissionsByStudentIds = async (studentIds) => {
 
     const queryResults = await Promise.all(
       chunks.map(async (chunk) => {
-        const q = query(
+        const archivedQuery = query(
           collectionGroup(db, 'submissions'),
           where('studentId', 'in', chunk)
         );
-        const querySnapshot = await getDocs(q);
+        const newQuery = query(
+          collection(db, 'student-information-form', 'form-values', 'new'),
+          where('studentId', 'in', chunk)
+        );
+        const [querySnapshot, newSnapshot] = await Promise.all([
+          getDocs(archivedQuery),
+          getDocs(newQuery)
+        ]);
 
-        return querySnapshot.docs.map((docSnapshot) => ({
+        return [...querySnapshot.docs, ...newSnapshot.docs].map((docSnapshot) => ({
           id: docSnapshot.id,
           ...docSnapshot.data()
         }));
@@ -827,34 +845,35 @@ export const getSubmissionsByStudentIds = async (studentIds) => {
  * @param {string} status - 'active' (default), 'archived', or 'all'
  * @returns {Promise<array>} - Submissions filtered by status
  */
-export const getSubmissionsByStatus = async (status = 'active') => {
+export const getSubmissionsByStatus = async (status = 'active', filters = {}) => {
   try {
     const submissions = [];
-    const q = query(collectionGroup(db, 'submissions'));
-    const querySnapshot = await getDocs(q);
+    const filterEntries = Object.entries({
+      faculty: filters.faculty,
+      department: filters.department,
+      degreeLevel: filters.degreeLevel
+    }).filter(([, value]) => value);
 
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      const isArchived = data.isArchived || false;
-      
-      // Filter based on status
-      if (status === 'active' && !isArchived) {
-        submissions.push({
-          id: doc.id,
-          ...data
-        });
-      } else if (status === 'archived' && isArchived) {
-        submissions.push({
-          id: doc.id,
-          ...data
-        });
-      } else if (status === 'all') {
-        submissions.push({
-          id: doc.id,
-          ...data
-        });
-      }
-    });
+    if (status === 'active' || status === 'all') {
+      const newCollection = collection(db, 'student-information-form', 'form-values', 'new');
+      const newQuery = filterEntries.length > 0
+        ? query(newCollection, ...filterEntries.map(([field, value]) => where(field, '==', value)))
+        : newCollection;
+      const newSnapshot = await getDocs(newQuery);
+      newSnapshot.forEach((submissionDoc) => {
+        submissions.push({ id: submissionDoc.id, ...submissionDoc.data() });
+      });
+    }
+
+    if (status === 'archived' || status === 'all') {
+      const archivedConstraints = [where('isArchived', '==', true), ...filterEntries.map(([field, value]) => where(field, '==', value))];
+      const archivedSnapshot = await getDocs(
+        query(collectionGroup(db, 'submissions'), ...archivedConstraints)
+      );
+      archivedSnapshot.forEach((submissionDoc) => {
+        submissions.push({ id: submissionDoc.id, ...submissionDoc.data() });
+      });
+    }
 
     // Sort by createdAt descending
     submissions.sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
@@ -871,11 +890,11 @@ export const getSubmissionsByStatus = async (status = 'active') => {
  */
 export const deleteStudentSubmission = async (studentId, faculty, department) => {
   try {
-    // faculty could be either full name or alias, we store facultyAlias in the form data
-    // Use the facultyAlias which is already stored in the submission
-    const submissionPath = `student-information-form/form-values/${faculty}/${department}/submissions/${studentId}`;
-    const docRef = doc(db, submissionPath);
-    const existingSubmission = await getDoc(docRef);
+    const newDocRef = doc(db, 'student-information-form', 'form-values', 'new', studentId);
+    const archivedDocRef = doc(db, `student-information-form/form-values/${faculty}/${department}/submissions/${studentId}`);
+    const newSubmission = await getDoc(newDocRef);
+    const docRef = newSubmission.exists() ? newDocRef : archivedDocRef;
+    const existingSubmission = newSubmission.exists() ? newSubmission : await getDoc(archivedDocRef);
 
     if (existingSubmission.exists()) {
       const existingData = existingSubmission.data();
@@ -909,15 +928,40 @@ export const deleteStudentSubmission = async (studentId, faculty, department) =>
  */
 export const updateSubmission = async (studentId, faculty, department, updateData) => {
   try {
-    const submissionPath = `student-information-form/form-values/${faculty}/${department}/submissions/${studentId}`;
-    const docRef = doc(db, submissionPath);
-    const existingSubmission = await getDoc(docRef);
+    const newDocRef = doc(db, 'student-information-form', 'form-values', 'new', studentId);
+    const archivedDocRef = doc(db, `student-information-form/form-values/${faculty}/${department}/submissions/${studentId}`);
+    const newSubmission = await getDoc(newDocRef);
+    const docRef = newSubmission.exists() ? newDocRef : archivedDocRef;
+    const existingSubmission = newSubmission.exists() ? newSubmission : await getDoc(archivedDocRef);
     const existingData = existingSubmission.exists() ? existingSubmission.data() : null;
 
-    await updateDoc(docRef, {
+    if (!existingData) {
+      throw new Error('Submission not found');
+    }
+
+    const currentIsArchived = existingData.isArchived || false;
+    const nextIsArchived = updateData.isArchived ?? currentIsArchived;
+    const nextData = {
+      ...existingData,
       ...updateData,
+      isArchived: nextIsArchived,
       updatedAt: serverTimestamp()
-    });
+    };
+
+    if (nextIsArchived !== currentIsArchived) {
+      const targetRef = nextIsArchived
+        ? doc(db, `student-information-form/form-values/${existingData.facultyAlias || faculty}/${existingData.department || department}/submissions/${studentId}`)
+        : newDocRef;
+      const batch = writeBatch(db);
+      batch.set(targetRef, nextData);
+      batch.delete(docRef);
+      await batch.commit();
+    } else {
+      await updateDoc(docRef, {
+        ...updateData,
+        updatedAt: serverTimestamp()
+      });
+    }
 
     if (existingData) {
       const previousFaculty = existingData.faculty || faculty;

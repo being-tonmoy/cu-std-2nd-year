@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import Box from '@mui/material/Box';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
@@ -22,7 +22,7 @@ const AcademicInformation = ({
   facultyData
 }) => {
   // Session options
-  const SESSIONS = ['2024-25', '2023-24', '2022-23', '2021-22', '2020-21', '2019-20', '2018-19'];
+  const SESSIONS = ['2025-26','2024-25', '2023-24', '2022-23', '2021-22', '2020-21', '2019-20', '2018-19'];
   
   // Safely get faculty list and sort alphabetically - memoized
   const facultyList = useMemo(() => {
@@ -47,6 +47,8 @@ const AcademicInformation = ({
     // console.log('Select changed:', e.target.name, '=', e.target.value);
     onInputChange(e);
   };
+
+
 
   return (
     <>
@@ -144,8 +146,8 @@ const AcademicInformation = ({
             >
               <MenuItem value="Bachelor">Bachelor</MenuItem>
               <MenuItem value="Masters">Masters</MenuItem>
-              <MenuItem value="M.Phil">M.Phil</MenuItem>
-              <MenuItem value="PhD">PhD</MenuItem>
+              {/* <MenuItem value="M.Phil">M.Phil</MenuItem>
+              <MenuItem value="PhD">PhD</MenuItem> */}
             </Select>
           </FormControl>
 
@@ -185,29 +187,79 @@ const AcademicInformation = ({
                 {formData.yearSemesterType === 'year' ? t('year') : t('semester')}
               </InputLabel>
               <Select
-                label={formData.yearSemesterType === 'year' ? t('year') : t('semester')}
-                name="yearSemesterValue"
-                value={formData.yearSemesterValue || ''}
-                onChange={handleSelectChange}
-                disabled={loading}
-              >
-                {formData.yearSemesterType === 'year' ? [
-                  <MenuItem key="1st" value="1st">{t('firstYear')}</MenuItem>,
-                  <MenuItem key="2nd" value="2nd">{t('secondYear')}</MenuItem>,
-                  <MenuItem key="3rd" value="3rd">{t('thirdYear')}</MenuItem>,
-                  <MenuItem key="4th" value="4th">{t('fourthYear')}</MenuItem>,
-                  <MenuItem key="5th" value="5th">{t('fifthYear')}</MenuItem>
-                ] : [
-                  <MenuItem key="1st" value="1st">{t('firstSemester')}</MenuItem>,
-                  <MenuItem key="2nd" value="2nd">{t('secondSemester')}</MenuItem>,
-                  <MenuItem key="3rd" value="3rd">{t('thirdSemester')}</MenuItem>,
-                  <MenuItem key="4th" value="4th">{t('fourthSemester')}</MenuItem>,
-                  <MenuItem key="5th" value="5th">{t('fifthSemester')}</MenuItem>,
-                  <MenuItem key="6th" value="6th">{t('sixthSemester')}</MenuItem>,
-                  <MenuItem key="7th" value="7th">{t('seventhSemester')}</MenuItem>,
-                  <MenuItem key="8th" value="8th">{t('eighthSemester')}</MenuItem>
-                ]}
-              </Select>
+                  label={formData.yearSemesterType === 'year' ? t('year') : t('semester')}
+                  name="yearSemesterValue"
+                  value={formData.yearSemesterValue || ''}
+                  onChange={handleSelectChange}
+                  disabled={loading}
+                >
+                  {formData.yearSemesterType === 'year'
+                    ? (
+                      formData.degreeLevel === 'Masters'
+                        ? [
+                            <MenuItem key="1st" value="1st">
+                              {t('firstYear')}
+                            </MenuItem>,
+                          ]
+                        : [
+                            <MenuItem key="1st" value="1st">
+                              {t('firstYear')}
+                            </MenuItem>,
+                            <MenuItem key="2nd" value="2nd">
+                              {t('secondYear')}
+                            </MenuItem>,
+                            <MenuItem key="3rd" value="3rd">
+                              {t('thirdYear')}
+                            </MenuItem>,
+                            <MenuItem key="4th" value="4th">
+                              {t('fourthYear')}
+                            </MenuItem>,
+                            <MenuItem key="5th" value="5th">
+                              {t('fifthYear')}
+                            </MenuItem>,
+                          ]
+                    )
+                    : (
+                      formData.degreeLevel === 'Masters'
+                        ? [
+                            <MenuItem key="1st" value="1st">
+                              {t('firstSemester')}
+                            </MenuItem>,
+                            <MenuItem key="2nd" value="2nd">
+                              {t('secondSemester')}
+                            </MenuItem>,
+                            <MenuItem key="3rd" value="3rd">
+                              {t('thirdSemester')}
+                            </MenuItem>,
+                          ]
+                        : [
+                            <MenuItem key="1st" value="1st">
+                              {t('firstSemester')}
+                            </MenuItem>,
+                            <MenuItem key="2nd" value="2nd">
+                              {t('secondSemester')}
+                            </MenuItem>,
+                            <MenuItem key="3rd" value="3rd">
+                              {t('thirdSemester')}
+                            </MenuItem>,
+                            <MenuItem key="4th" value="4th">
+                              {t('fourthSemester')}
+                            </MenuItem>,
+                            <MenuItem key="5th" value="5th">
+                              {t('fifthSemester')}
+                            </MenuItem>,
+                            <MenuItem key="6th" value="6th">
+                              {t('sixthSemester')}
+                            </MenuItem>,
+                            <MenuItem key="7th" value="7th">
+                              {t('seventhSemester')}
+                            </MenuItem>,
+                            <MenuItem key="8th" value="8th">
+                              {t('eighthSemester')}
+                            </MenuItem>,
+                          ]
+                    )}
+                </Select>
             </FormControl>
           </Box>
         </Box>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import Container from '@mui/material/Container';
@@ -49,7 +49,7 @@ const SubmissionManagement = () => {
   const navigate = useNavigate();
   const [submissions, setSubmissions] = useState([]);
   const [filteredSubmissions, setFilteredSubmissions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [appliedSearchQuery, setAppliedSearchQuery] = useState('');
   const [order, setOrder] = useState('desc');
@@ -74,23 +74,8 @@ const SubmissionManagement = () => {
   // Store active and archived data separately for faster filtering
   const [activeSubmissions, setActiveSubmissions] = useState([]);
   const [archivedSubmissions, setArchivedSubmissions] = useState([]);
-
-  useEffect(() => {
-    loadInitialSubmissions(); // Only load active submissions on initial mount
-    loadFacultyData();
-  }, []);
-
-  // Handle filter changes and load data as needed
-  useEffect(() => {
-    if (filterArchived === 'active' && !loadedData.active) {
-      loadActiveSubmissions();
-    } else if (filterArchived === 'archived' && !loadedData.archived) {
-      loadArchivedSubmissions();
-    } else if (filterArchived === 'all' && !loadedData.all) {
-      loadAllSubmissionsData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterArchived, loadedData]);
+  const filtersInitialized = useRef(false);
+  const loadCurrentFilterRef = useRef(null);
 
   // Update submissions display when filter or loaded data changes
   useEffect(() => {
@@ -104,21 +89,14 @@ const SubmissionManagement = () => {
   useEffect(() => {
     let filtered = [...submissions];
 
-    // Apply search filter across all fields
     if (appliedSearchQuery) {
       const query = appliedSearchQuery.toLowerCase();
-      filtered = filtered.filter(sub => {
-        const searchString = JSON.stringify(sub).toLowerCase();
-        return searchString.includes(query);
-      });
+      filtered = filtered.filter(sub => JSON.stringify(sub).toLowerCase().includes(query));
     }
 
-    // Apply faculty filter
     if (filterFaculty) {
       filtered = filtered.filter(sub => sub.faculty === filterFaculty);
     }
-
-    // Apply department filter
     if (filterDepartment) {
       filtered = filtered.filter(sub => sub.department === filterDepartment);
     }
@@ -145,6 +123,16 @@ const SubmissionManagement = () => {
     setFilteredSubmissions(filtered);
   }, [submissions, appliedSearchQuery, order, orderBy, filterFaculty, filterDepartment, filterDegreeLevel]);
 
+  useEffect(() => {
+    if (!filtersInitialized.current) {
+      filtersInitialized.current = true;
+      loadFacultyData();
+      return;
+    }
+
+    loadCurrentFilterRef.current?.();
+  }, [filterArchived, filterFaculty, filterDepartment, filterDegreeLevel]);
+
   // Helper function to reload data based on current filter
   const reloadCurrentFilter = async () => {
     if (filterArchived === 'active') {
@@ -157,9 +145,10 @@ const SubmissionManagement = () => {
   };
 
   // Apply search filter when user clicks button or presses Enter
-  const handleApplyFilter = () => {
+  const handleApplyFilter = async () => {
     setAppliedSearchQuery(searchQuery);
     setPage(0); // Reset to first page when applying new filter
+    await loadCurrentFilter();
   };
 
   // Handle Enter key in search input
@@ -180,39 +169,18 @@ const SubmissionManagement = () => {
     }
   };
 
-  // Load only active submissions on initial page load
-  const loadInitialSubmissions = async () => {
-    try {
-      setLoading(true);
-      const data = await getSubmissionsByStatus('active');
-      setActiveSubmissions(data || []);
-      setSubmissions(data || []);
-      setLoadedData(prev => ({ ...prev, active: true }));
-    } catch (error) {
-      console.error('Error loading active submissions:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Failed to load submissions',
-        confirmButtonColor: '#001f3f'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Load only active submissions when filter is set to 'active'
   const loadActiveSubmissions = async () => {
     try {
       setLoading(true);
-      if (!loadedData.active) {
-        const data = await getSubmissionsByStatus('active');
-        setActiveSubmissions(data || []);
-        setSubmissions(data || []);
-        setLoadedData(prev => ({ ...prev, active: true }));
-      } else {
-        setSubmissions(activeSubmissions);
-      }
+      const data = await getSubmissionsByStatus('active', {
+        faculty: filterFaculty,
+        department: filterDepartment,
+        degreeLevel: filterDegreeLevel
+      });
+      setActiveSubmissions(data || []);
+      setSubmissions(data || []);
+      setLoadedData(prev => ({ ...prev, active: true }));
     } catch (error) {
       console.error('Error loading active submissions:', error);
       Swal.fire({
@@ -230,14 +198,14 @@ const SubmissionManagement = () => {
   const loadArchivedSubmissions = async () => {
     try {
       setLoading(true);
-      if (!loadedData.archived) {
-        const data = await getSubmissionsByStatus('archived');
-        setArchivedSubmissions(data || []);
-        setSubmissions(data || []);
-        setLoadedData(prev => ({ ...prev, archived: true }));
-      } else {
-        setSubmissions(archivedSubmissions);
-      }
+      const data = await getSubmissionsByStatus('archived', {
+        faculty: filterFaculty,
+        department: filterDepartment,
+        degreeLevel: filterDegreeLevel
+      });
+      setArchivedSubmissions(data || []);
+      setSubmissions(data || []);
+      setLoadedData(prev => ({ ...prev, archived: true }));
     } catch (error) {
       console.error('Error loading archived submissions:', error);
       Swal.fire({
@@ -255,15 +223,13 @@ const SubmissionManagement = () => {
   const loadAllSubmissionsData = async () => {
     try {
       setLoading(true);
-      if (!loadedData.all) {
-        const data = await getSubmissionsByStatus('all');
-        setSubmissions(data || []);
-        setLoadedData(prev => ({ ...prev, all: true }));
-      } else {
-        // If already loaded, combine both datasets
-        const combined = [...activeSubmissions, ...archivedSubmissions];
-        setSubmissions(combined.length > 0 ? combined : submissions);
-      }
+      const data = await getSubmissionsByStatus('all', {
+        faculty: filterFaculty,
+        department: filterDepartment,
+        degreeLevel: filterDegreeLevel
+      });
+      setSubmissions(data || []);
+      setLoadedData(prev => ({ ...prev, all: true }));
     } catch (error) {
       console.error('Error loading all submissions:', error);
       Swal.fire({
@@ -276,6 +242,18 @@ const SubmissionManagement = () => {
       setLoading(false);
     }
   };
+
+  const loadCurrentFilter = async () => {
+    await loadFacultyData();
+    if (filterArchived === 'active') {
+      await loadActiveSubmissions();
+    } else if (filterArchived === 'archived') {
+      await loadArchivedSubmissions();
+    } else {
+      await loadAllSubmissionsData();
+    }
+  };
+  loadCurrentFilterRef.current = loadCurrentFilter;
 
   const handleRequestSort = (property) => {
     const isAsc = orderBy === property && order === 'asc';

@@ -23,11 +23,12 @@ import PeopleIcon from '@mui/icons-material/People';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import SchoolIcon from '@mui/icons-material/School';
 import WarningIcon from '@mui/icons-material/Warning';
+import SyncIcon from '@mui/icons-material/Sync';
 import Swal from 'sweetalert2';
 import { Bar, Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip as ChartTooltip, Legend, Filler } from 'chart.js';
 import { useAuth } from '../contexts/AuthContext';
-import { getDashboardSummary } from '../services/firestoreService';
+import { getDashboardSummary, syncDashboardSummary } from '../services/firestoreService';
 import { db } from '../utils/firebase';
 import { collection, getCountFromServer, query, where } from 'firebase/firestore';
 
@@ -42,10 +43,14 @@ const AdminDashboard = () => {
   const [complaintsLoading, setComplaintsLoading] = useState(true);
   const [facultySortConfig, setFacultySortConfig] = useState({ key: 'count', direction: 'desc' });
   const [departmentSortConfig, setDepartmentSortConfig] = useState({ key: 'count', direction: 'desc' });
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     loadSubmissions();
     loadComplaints();
+
+    const refreshInterval = window.setInterval(loadSubmissions, 60000);
+    return () => window.clearInterval(refreshInterval);
   }, []);
 
   const loadSubmissions = async () => {
@@ -77,6 +82,32 @@ const AdminDashboard = () => {
       console.error('Error loading complaints:', error);
     } finally {
       setComplaintsLoading(false);
+    }
+  };
+
+  const handleSync = async () => {
+    try {
+      setSyncing(true);
+      const summary = await syncDashboardSummary();
+      setDashboardSummary(summary);
+      await loadComplaints();
+      Swal.fire({
+        icon: 'success',
+        title: 'Dashboard synced',
+        text: 'Counts and charts were rebuilt from current submissions.',
+        timer: 1800,
+        showConfirmButton: false
+      });
+    } catch (error) {
+      console.error('Error syncing dashboard:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Sync failed',
+        text: 'Failed to rebuild dashboard data.',
+        confirmButtonColor: '#001f3f'
+      });
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -155,6 +186,7 @@ const AdminDashboard = () => {
   const submissionsByFaculty = dashboardSummary?.submissionsByFaculty || {};
   const submissionsByDepartment = dashboardSummary?.submissionsByDepartment || {};
   const submissionsByDate = dashboardSummary?.submissionsByDate || {};
+  const submissionsByMonth = dashboardSummary?.submissionsByMonth || {};
   const sessionCounts = dashboardSummary?.sessionCounts || {};
 
   const stats = {
@@ -172,6 +204,11 @@ const AdminDashboard = () => {
     .map(([date]) => date)
     .sort();
   const dateWiseData = sortedDates.map(date => submissionsByDate[date]);
+  const sortedMonths = Object.entries(submissionsByMonth)
+    .filter(([, count]) => count > 0)
+    .map(([month]) => month)
+    .sort();
+  const monthWiseData = sortedMonths.map(month => submissionsByMonth[month]);
 
   return (
     <>
@@ -226,6 +263,15 @@ const AdminDashboard = () => {
               sx={{ borderColor: '#ff6f00', color: '#ff6f00', fontWeight: 'bold' }}
             >
               Manage Complaints
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<SyncIcon />}
+              onClick={handleSync}
+              disabled={syncing}
+              sx={{ bgcolor: '#00897b', '&:hover': { bgcolor: '#00695c' }, fontWeight: 'bold' }}
+            >
+              {syncing ? 'Syncing...' : 'Sync Data'}
             </Button>
             <Button
               variant="outlined"
@@ -750,6 +796,34 @@ const AdminDashboard = () => {
                   </Box>
                 </Grid>
               </Grid>
+            </Box>
+          </Paper>
+        ) : null}
+
+        {submissionsLoading ? null : sortedMonths.length > 0 ? (
+          <Paper sx={{ p: 3, mb: 4, borderRadius: '12px' }}>
+            <Typography variant="h6" sx={{ color: '#001f3f', fontWeight: 'bold', mb: 3 }}>
+              Submissions by Month
+            </Typography>
+            <Box sx={{ height: '360px' }}>
+              <Bar
+                data={{
+                  labels: sortedMonths,
+                  datasets: [{
+                    label: 'Monthly Submissions',
+                    data: monthWiseData,
+                    backgroundColor: '#0288d1',
+                    borderColor: '#001f3f',
+                    borderWidth: 1,
+                    borderRadius: 4
+                  }]
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }}
+              />
             </Box>
           </Paper>
         ) : null}
