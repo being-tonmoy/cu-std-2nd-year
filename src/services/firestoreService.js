@@ -866,12 +866,17 @@ export const getSubmissionsByStatus = async (status = 'active', filters = {}) =>
     }
 
     if (status === 'archived' || status === 'all') {
-      const archivedConstraints = [where('isArchived', '==', true), ...filterEntries.map(([field, value]) => where(field, '==', value))];
+      // Keep this collection-group query to one field so filter combinations
+      // do not require separate composite Firestore indexes.
       const archivedSnapshot = await getDocs(
-        query(collectionGroup(db, 'submissions'), ...archivedConstraints)
+        query(collectionGroup(db, 'submissions'), where('isArchived', '==', true))
       );
       archivedSnapshot.forEach((submissionDoc) => {
-        submissions.push({ id: submissionDoc.id, ...submissionDoc.data() });
+        const submission = { id: submissionDoc.id, ...submissionDoc.data() };
+        const matchesFilters = filterEntries.every(([field, value]) => submission[field] === value);
+        if (matchesFilters) {
+          submissions.push(submission);
+        }
       });
     }
 

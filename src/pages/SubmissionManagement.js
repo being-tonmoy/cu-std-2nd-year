@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import Container from '@mui/material/Container';
@@ -65,6 +65,10 @@ const SubmissionManagement = () => {
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [filterArchived, setFilterArchived] = useState('active');
   const [filterDegreeLevel, setFilterDegreeLevel] = useState('');
+  const [appliedFilterArchived, setAppliedFilterArchived] = useState('active');
+  const [appliedFilterFaculty, setAppliedFilterFaculty] = useState('');
+  const [appliedFilterDepartment, setAppliedFilterDepartment] = useState('');
+  const [appliedFilterDegreeLevel, setAppliedFilterDegreeLevel] = useState('');
   // Track which data sets have been loaded to avoid redundant Firebase queries
   const [loadedData, setLoadedData] = useState({
     active: false,
@@ -74,17 +78,14 @@ const SubmissionManagement = () => {
   // Store active and archived data separately for faster filtering
   const [activeSubmissions, setActiveSubmissions] = useState([]);
   const [archivedSubmissions, setArchivedSubmissions] = useState([]);
-  const filtersInitialized = useRef(false);
-  const loadCurrentFilterRef = useRef(null);
-
   // Update submissions display when filter or loaded data changes
   useEffect(() => {
-    if (filterArchived === 'active' && loadedData.active) {
+    if (appliedFilterArchived === 'active' && loadedData.active) {
       setSubmissions(activeSubmissions);
-    } else if (filterArchived === 'archived' && loadedData.archived) {
+    } else if (appliedFilterArchived === 'archived' && loadedData.archived) {
       setSubmissions(archivedSubmissions);
     }
-  }, [filterArchived, loadedData.active, loadedData.archived, activeSubmissions, archivedSubmissions]);
+  }, [appliedFilterArchived, loadedData.active, loadedData.archived, activeSubmissions, archivedSubmissions]);
 
   useEffect(() => {
     let filtered = [...submissions];
@@ -94,16 +95,16 @@ const SubmissionManagement = () => {
       filtered = filtered.filter(sub => JSON.stringify(sub).toLowerCase().includes(query));
     }
 
-    if (filterFaculty) {
-      filtered = filtered.filter(sub => sub.faculty === filterFaculty);
+    if (appliedFilterFaculty) {
+      filtered = filtered.filter(sub => sub.faculty === appliedFilterFaculty);
     }
-    if (filterDepartment) {
-      filtered = filtered.filter(sub => sub.department === filterDepartment);
+    if (appliedFilterDepartment) {
+      filtered = filtered.filter(sub => sub.department === appliedFilterDepartment);
     }
 
     // Apply degree level filter
-    if (filterDegreeLevel) {
-      filtered = filtered.filter(sub => (sub.degreeLevel || 'Bachelor') === filterDegreeLevel);
+    if (appliedFilterDegreeLevel) {
+      filtered = filtered.filter(sub => (sub.degreeLevel || 'Bachelor') === appliedFilterDegreeLevel);
     }
 
     // Sort
@@ -121,17 +122,7 @@ const SubmissionManagement = () => {
     });
 
     setFilteredSubmissions(filtered);
-  }, [submissions, appliedSearchQuery, order, orderBy, filterFaculty, filterDepartment, filterDegreeLevel]);
-
-  useEffect(() => {
-    if (!filtersInitialized.current) {
-      filtersInitialized.current = true;
-      loadFacultyData();
-      return;
-    }
-
-    loadCurrentFilterRef.current?.();
-  }, [filterArchived, filterFaculty, filterDepartment, filterDegreeLevel]);
+  }, [submissions, appliedSearchQuery, order, orderBy, appliedFilterFaculty, appliedFilterDepartment, appliedFilterDegreeLevel]);
 
   // Helper function to reload data based on current filter
   const reloadCurrentFilter = async () => {
@@ -146,6 +137,10 @@ const SubmissionManagement = () => {
 
   // Apply search filter when user clicks button or presses Enter
   const handleApplyFilter = async () => {
+    setAppliedFilterArchived(filterArchived);
+    setAppliedFilterFaculty(filterFaculty);
+    setAppliedFilterDepartment(filterDepartment);
+    setAppliedFilterDegreeLevel(filterDegreeLevel);
     setAppliedSearchQuery(searchQuery);
     setPage(0); // Reset to first page when applying new filter
     await loadCurrentFilter();
@@ -253,7 +248,6 @@ const SubmissionManagement = () => {
       await loadAllSubmissionsData();
     }
   };
-  loadCurrentFilterRef.current = loadCurrentFilter;
 
   const handleRequestSort = (property) => {
     const isAsc = orderBy === property && order === 'asc';
